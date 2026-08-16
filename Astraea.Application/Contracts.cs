@@ -4,6 +4,7 @@ public record RegisterUserRequest(string FullName,string Email,string Password,U
 public record LoginRequest(string Email,string Password);
 public record AuthResponseDto(string AccessToken,Guid UserId,string FullName,string Role);
 public record ChangePasswordRequest(string CurrentPassword,string NewPassword);
+public record ForgotPasswordResetRequest(string Email,string NewPassword);
 public record MentorInviteRequest(string Email);
 public record MentorLearnerDto(Guid Id,string MentorEmail,string? MentorName,MentorLearnerStatus Status,DateTime InvitedAtUtc,DateTime StatusUpdatedAtUtc);
 public record LearnerSummaryDto(Guid Id,string FullName,string Email,int SkillCount,double AverageRetention,DateTime LastActiveUtc);
@@ -18,7 +19,7 @@ public record GitHubConnectRequest(string Username);
 public record GitHubConnectionDto(bool IsConnected,string? GitHubUsername,DateTime? ConnectedAtUtc,DateTime? LastSyncDateUtc,int ReposScanned,int SignalsImported,bool IsVerified);
 public record GitHubSyncResultDto(string GitHubUsername,int ReposScanned,int SignalsImported,DateTime SyncedAtUtc);
 public record GitHubOAuthStartDto(string AuthorizationUrl);
-public interface IAuthService { Task<AuthResponseDto> RegisterAsync(RegisterUserRequest request,CancellationToken ct); Task<AuthResponseDto> LoginAsync(LoginRequest request,CancellationToken ct); Task ChangePasswordAsync(Guid userId,ChangePasswordRequest request,CancellationToken ct); }
+public interface IAuthService { Task<AuthResponseDto> RegisterAsync(RegisterUserRequest request,CancellationToken ct); Task<AuthResponseDto> LoginAsync(LoginRequest request,CancellationToken ct); Task ChangePasswordAsync(Guid userId,ChangePasswordRequest request,CancellationToken ct); Task ResetForgottenPasswordAsync(ForgotPasswordResetRequest request,CancellationToken ct); }
 public interface IMentorService { Task<IReadOnlyCollection<MentorLearnerDto>> GetLearnerMentorsAsync(Guid learnerId,CancellationToken ct); Task<MentorLearnerDto> InviteMentorAsync(Guid learnerId,string email,CancellationToken ct); Task CancelInvitationAsync(Guid id,Guid learnerId,CancellationToken ct); Task RevokeAccessAsync(Guid id,Guid learnerId,CancellationToken ct); Task<IReadOnlyCollection<MentorLearnerDto>> GetPendingInvitationsForMentorAsync(Guid mentorId,CancellationToken ct); Task<AuthResponseDto> AcceptInvitationAsync(Guid id,Guid mentorId,CancellationToken ct); Task DeclineInvitationAsync(Guid id,Guid mentorId,CancellationToken ct); Task<IReadOnlyCollection<LearnerSummaryDto>> GetActiveMenteesAsync(Guid mentorId,CancellationToken ct); Task<LearnerDashboardDto> GetLearnerDashboardReadOnlyAsync(Guid mentorId,Guid learnerId,CancellationToken ct); }
 public interface ISkillService { Task<CelestialNodeDto> CreateSkillAsync(Guid learnerId,CreateSkillRequest request,CancellationToken ct); Task<IReadOnlyCollection<CelestialNodeDto>> GetSkillsAsync(Guid learnerId,CancellationToken ct); }
 public interface IReportService { Task<LearnerReportDto> GetLearnerReportAsync(Guid learnerId,CancellationToken ct); }

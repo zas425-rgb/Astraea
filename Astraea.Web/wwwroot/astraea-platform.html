@@ -218,7 +218,7 @@
       </div>
 
       <button id="authSubmit" class="navigate w-full text-xs font-semibold py-2.5 rounded-lg mt-4" style="background:var(--teal); color:#04140f">Sign In</button>
-      <p class="text-[10px] text-slate-500 text-center mt-4">Forgot your password? <span class="text-teal-300 cursor-default">Reset it here</span></p>
+      <p class="text-[10px] text-slate-500 text-center mt-4">Forgot your password? <button id="forgotPasswordBtn" type="button" class="text-teal-300 hover:text-teal-200">Reset it here</button></p>
     </div>
   </div>
 </section>
@@ -739,6 +739,22 @@ document.getElementById('authSubmit').addEventListener('click', async function()
   this.disabled=true;
   try { const session=await astraeaApi('/api/auth/'+(isRegister?'register':'login'),{method:'POST',body:JSON.stringify(body)}); localStorage.setItem('astraea.session',JSON.stringify(session)); await loadPersistedSkills(); applyRoleVisibility(session); showView(session.role==='Mentor'?'mentorWorkspace':'dashboard'); toast('Welcome to Astraea, '+session.fullName+'.'); }
   catch(error){toast(error.message);} finally {this.disabled=false;}
+});
+document.getElementById('forgotPasswordBtn').addEventListener('click', async ()=>{
+  const email=prompt('Enter the email for your Astraea account:');
+  if(email===null)return;
+  const cleanEmail=email.trim();
+  if(!cleanEmail){toast('Enter the account email first.');return;}
+  const newPassword=prompt('Enter a new password (at least 8 characters):');
+  if(newPassword===null)return;
+  if(newPassword.length<8){toast('Your new password must be at least eight characters.');return;}
+  const confirmPassword=prompt('Confirm your new password:');
+  if(confirmPassword===null)return;
+  if(newPassword!==confirmPassword){toast('The passwords do not match.');return;}
+  try{
+    await astraeaApi('/api/auth/forgot-password/reset',{method:'POST',body:JSON.stringify({email:cleanEmail,newPassword})});
+    toast('Password reset successfully. You can sign in now.');
+  }catch(error){toast(error.message);}
 });
 document.getElementById('githubSignInBtn').addEventListener('click',async function(){
   this.disabled=true; this.textContent='Opening GitHub...';
