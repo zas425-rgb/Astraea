@@ -1,0 +1,48 @@
+# Build outputs
+bin/
+obj/
+**/bin/
+**/obj/
+
+# Visual Studio local files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / JetBrains
+.idea/
+
+# Logs
+logs/
+*.log
+Astraea.Web/logs/
+
+# Local database files
+*.mdf
+*.ldf
+*.db
+*.sqlite
+*.sqlite3
+
+# Local development secrets/configuration
+appsettings.Development.json
+**/appsettings.Development.json
+secrets.json
+
+# Local-only study/prep notes
+STUDY_GUIDE.md
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+.DS_Store
+Thumbs.db
+
+# Verification/build scratch folders
+.verify-build/
+TestResults/
+coverage/
+*.trx

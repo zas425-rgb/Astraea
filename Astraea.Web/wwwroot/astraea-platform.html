@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Astraea — Celestial Skill & Retention Tracker</title>
+<link rel="icon" type="image/svg+xml" href="/astraea-logo-glow.svg">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --teal:#00F5D4; --teal-dim:#1F9E89;
+    --amber:#FFB703; --amber-dim:#E8A33D;
+    --coral:#E2574C; --lavender:#C7D2FE;
+  }
+  html,body{background:radial-gradient(ellipse at 25% 0%, #0B0E1E 0%, #050711 55%, #020307 100%); font-family:'Inter',sans-serif; color:var(--lavender); overflow-x:hidden;}
+  .font-display{font-family:'Space Grotesk',sans-serif;}
+  #bgfield{position:fixed; inset:0; z-index:0; pointer-events:none;}
+  .glass{background:rgba(15,18,38,0.75); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid rgba(199,210,254,0.12);}
+  .navtab{transition:all .18s ease; white-space:nowrap;}
+  .navtab.active{background:rgba(0,245,212,0.1); color:var(--teal); border-color:rgba(0,245,212,0.35);}
+  .navtab:not(.active):hover{background:rgba(255,255,255,0.05);}
+  .view-section{display:none;}
+  .view-section.active{display:block;}
+  ::-webkit-scrollbar{width:6px; height:6px;}
+  ::-webkit-scrollbar-thumb{background:rgba(199,210,254,0.2); border-radius:99px;}
+  .drawer{transition:transform .4s cubic-bezier(.16,1,.3,1); transform:translateX(100%);}
+  .drawer.open{transform:translateX(0);}
+  .modal-backdrop{transition:opacity .2s ease;}
+  @keyframes pulse-soft{0%,100%{opacity:1;} 50%{opacity:.4;}}
+  .pulse-soft{animation:pulse-soft 2.2s ease-in-out infinite;}
+  input,select,textarea{outline:none;}
+  input::placeholder, textarea::placeholder{color:#64748b;}
+  .badge-fresh{color:var(--teal); background:rgba(0,245,212,0.1); border:1px solid rgba(0,245,212,0.3);}
+  .badge-fading{color:var(--amber); background:rgba(255,183,3,0.1); border:1px solid rgba(255,183,3,0.3);}
+  .badge-atrisk{color:var(--coral); background:rgba(226,87,76,0.1); border:1px solid rgba(226,87,76,0.3);}
+  .badge-active{color:var(--teal); background:rgba(0,245,212,0.1); border:1px solid rgba(0,245,212,0.3);}
+  .toast{transition:all .3s cubic-bezier(.16,1,.3,1);}
+  .role-card{transition:all .2s ease; cursor:pointer;}
+  .role-card.selected{border-color:rgba(0,245,212,0.5); background:rgba(0,245,212,0.06);}
+  .star-pick{cursor:pointer; transition:transform .1s ease;}
+  .star-pick:hover{transform:scale(1.15);}
+  .fab{box-shadow:0 8px 30px rgba(0,245,212,0.35);}
+  .prereq-chip{cursor:pointer; transition:all .15s ease;}
+  .prereq-chip.selected{background:rgba(0,245,212,0.12); border-color:rgba(0,245,212,0.4); color:var(--teal);}
+  @media (max-width: 767px){
+    #navTabs{display:none;}
+    #mobileMenuBtn{display:flex;}
+    #brandHome .brand-text{font-size:12px; letter-spacing:.18em;}
+    main{padding-top:64px;}
+    .mobile-menu-open #mobileNavPanel{opacity:1; transform:translateY(0); pointer-events:auto;}
+  }
+  @media (min-width: 768px){
+    #mobileMenuBtn,#mobileNavPanel{display:none!important;}
+    #profileMenu{margin-left:0;}
+  }
+</style>
+</head>
+<body class="min-h-screen">
+
+<canvas id="bgfield"></canvas>
+
+<template id="logoTemplate">
+  <img src="/astraea-logo-glow.svg" alt="Astraea logo" width="36" height="36" class="block rounded-xl">
+</template>
+
+<!-- ============ HEADER / ROUTER NAV ============ -->
+<header class="fixed top-0 inset-x-0 z-40 glass">
+  <div class="max-w-[1800px] mx-auto px-4 py-2.5 flex items-center gap-4">
+    <button id="brandHome" class="flex items-center gap-2.5 shrink-0" aria-label="Open celestial map"><span id="logoSlot0"></span><span class="brand-text font-display font-semibold tracking-[0.25em] text-sm">ASTRAEA</span></button>
+    <nav class="flex-1 flex items-center gap-1.5 overflow-x-auto ml-2" id="navTabs">
+      <button data-view="landing" class="navtab active text-[11px] font-medium px-3 py-1.5 rounded-full border border-white/10">Home</button>
+      <button data-view="auth" class="navtab text-[11px] font-medium px-3 py-1.5 rounded-full border border-white/10">Login / Register</button>
+      <button data-view="dashboard" class="navtab text-[11px] font-medium px-3 py-1.5 rounded-full border border-white/10">Celestial Map</button>
+      <button data-view="queue" class="navtab text-[11px] font-medium px-3 py-1.5 rounded-full border border-white/10">Review Queue</button>
+      <button data-view="manage" class="navtab text-[11px] font-medium px-3 py-1.5 rounded-full border border-white/10">Manage Skills</button>
+      <button data-view="abyss" class="navtab text-[11px] font-medium px-3 py-1.5 rounded-full border border-white/10">The Abyss</button>
+      <button data-view="mentorSettings" class="navtab text-[11px] font-medium px-3 py-1.5 rounded-full border border-white/10">Mentor Access</button>
+      <button data-view="mentorWorkspace" class="navtab text-[11px] font-medium px-3 py-1.5 rounded-full border border-white/10">Mentor Workspace</button>
+      <button data-view="reports" class="navtab text-[11px] font-medium px-3 py-1.5 rounded-full border border-white/10">Reports</button>
+      <button data-view="settings" class="navtab text-[11px] font-medium px-3 py-1.5 rounded-full border border-white/10">GitHub Settings</button>
+    </nav>
+    <div id="profileMenu" class="hidden relative shrink-0 ml-auto">
+      <button id="profileToggle" class="flex items-center gap-2 rounded-full border border-white/10 px-2.5 py-1.5 hover:bg-white/5 text-left"><span class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold" style="background:rgba(0,245,212,.14);color:var(--teal)" id="profileInitial">A</span><span class="hidden lg:block"><span id="profileName" class="block text-[11px] text-slate-200 max-w-24 truncate"></span><span id="profileRole" class="block text-[9px] text-slate-500"></span></span></button>
+      <div id="profilePopover" class="hidden absolute right-0 top-11 w-48 glass rounded-xl p-2 text-xs shadow-2xl"><button id="changePasswordBtn" class="w-full text-left rounded-lg px-3 py-2 hover:bg-white/5">Change password</button><button id="logoutBtn" class="w-full text-left rounded-lg px-3 py-2 text-rose-300 hover:bg-rose-400/10">Log out</button></div>
+    </div>
+    <button id="mobileMenuBtn" class="hidden shrink-0 items-center justify-center w-9 h-9 rounded-lg border border-white/10 hover:bg-white/5" aria-label="Open navigation" aria-expanded="false">
+      <span class="flex flex-col gap-1.5"><span class="block w-4 h-px bg-slate-200"></span><span class="block w-4 h-px bg-slate-200"></span><span class="block w-4 h-px bg-slate-200"></span></span>
+    </button>
+    <div class="hidden">
+      <span class="w-1.5 h-1.5 rounded-full pulse-soft" style="background:var(--teal)"></span> Demo mode — all views unlocked
+    </div>
+  </div>
+  <div id="mobileNavPanel" class="absolute left-3 right-3 top-[58px] glass rounded-xl p-3 opacity-0 pointer-events-none -translate-y-2 transition duration-200 shadow-2xl">
+    <div id="mobileNavItems" class="grid gap-2"></div>
+  </div>
+</header>
+
+<main class="relative z-10 pt-16">
+
+<!-- ======================================================= -->
+<!-- VIEW: LANDING -->
+<!-- ======================================================= -->
+<section id="view-landing" class="view-section active">
+  <nav class="hidden lg:flex items-center justify-end gap-8 max-w-[1300px] mx-auto px-6 pt-4 text-xs text-slate-400">
+    <a href="#landing-features" class="hover:text-slate-200">Features</a>
+    <a href="#landing-technology" class="hover:text-slate-200">Technology</a>
+    <a href="#landing-use-cases" class="hover:text-slate-200">Use Cases</a>
+    <a href="#landing-about" class="hover:text-slate-200">About</a>
+    <button data-view="auth" class="navigate text-[11px] font-medium px-4 py-2 rounded-full border border-teal-400/30 text-teal-300 hover:bg-teal-400/10">Get Started</button>
+  </nav>
+  <div class="max-w-[1300px] mx-auto px-6 py-14 grid lg:grid-cols-2 gap-10 items-center">
+    <div>
+      <h1 class="font-display text-4xl md:text-5xl font-semibold leading-[1.1]">
+        Map Your Mind. <br> Never Lose a <span style="color:var(--teal)">Learned Skill.</span>
+      </h1>
+      <p class="text-sm text-slate-400 mt-5 max-w-md">A passive, automated, evidence-based retention tracker for self-taught learners and their mentors. Astraea models how memory fades and surfaces what needs a refresher — before you forget it happened.</p>
+      <div class="flex items-center gap-3 mt-7">
+        <button data-view="auth" class="navigate text-xs font-medium px-5 py-3 rounded-full border border-teal-400/30 text-teal-300 hover:bg-teal-400/10 flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.74.5 12.02c0 5.02 3.29 9.28 7.86 10.79.57.1.79-.25.79-.55 0-.27-.01-1.16-.02-2.11-3.2.7-3.87-1.36-3.87-1.36-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.17.08 1.78 1.2 1.78 1.2 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.56-.29-5.26-1.28-5.26-5.7 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.64 1.59.24 2.76.12 3.05.74.8 1.18 1.83 1.18 3.09 0 4.43-2.7 5.4-5.28 5.69.42.36.78 1.07.78 2.16 0 1.56-.02 2.82-.02 3.2 0 .3.21.66.8.55A10.53 10.53 0 0 0 23.5 12c0-6.28-5.22-11.5-11.5-11.5Z"/></svg>
+          Connect GitHub
+        </button>
+        <button data-view="auth" data-register="1" class="navigate text-xs font-medium px-5 py-3 rounded-full border border-white/15 hover:bg-white/5">Create Free Account</button>
+      </div>
+      <div class="grid grid-cols-3 gap-3 mt-9 max-w-md">
+        <div class="glass rounded-xl px-3 py-2.5 text-center"><div class="text-[9px] uppercase text-slate-400">Total Stars Lit</div><div class="font-display text-lg font-semibold" style="color:var(--teal)">312</div></div>
+        <div class="glass rounded-xl px-3 py-2.5 text-center"><div class="text-[9px] uppercase text-slate-400">At-Risk</div><div class="font-display text-lg font-semibold" style="color:var(--coral)">45</div></div>
+        <div class="glass rounded-xl px-3 py-2.5 text-center"><div class="text-[9px] uppercase text-slate-400">Stardust XP</div><div class="font-display text-lg font-semibold" style="color:var(--amber)">3,120</div></div>
+      </div>
+    </div>
+    <div class="relative rounded-2xl glass overflow-hidden" style="height:380px">
+      <canvas id="heroCanvas" class="w-full h-full"></canvas>
+      <div class="absolute top-3 left-4 text-[11px] font-display font-semibold text-slate-300">Celestial Skill Map — live preview</div>
+    </div>
+  </div>
+  <div class="max-w-[1300px] mx-auto px-6 pb-16 grid sm:grid-cols-3 gap-4">
+    <div class="glass rounded-xl p-5">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center mb-3" style="background:rgba(0,245,212,0.1)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00F5D4" stroke-width="2"><path d="M3 17l4-4 4 4 4-8 4 4"/></svg>
+      </div>
+      <div class="font-display font-semibold text-sm mb-1">SM-2 Retention Decay</div>
+      <p class="text-xs text-slate-400">An evidence-based spaced-repetition model estimates how well each skill is remembered, updating EaseFactor and interval on every review.</p>
+    </div>
+    <div class="glass rounded-xl p-5">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center mb-3" style="background:rgba(255,183,3,0.1)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFB703" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      </div>
+      <div class="font-display font-semibold text-sm mb-1">Automatic GitHub Sync</div>
+      <p class="text-xs text-slate-400">Nightly commit scans detect real coding practice and strengthen matching skills automatically — no manual logging required.</p>
+    </div>
+    <div class="glass rounded-xl p-5">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center mb-3" style="background:rgba(226,87,76,0.1)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E2574C" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="font-display font-semibold text-sm mb-1">Scoped Mentor Access</div>
+      <p class="text-xs text-slate-400">Invite a mentor for read-only visibility into your progress — full transparency, zero control over your data.</p>
+    </div>
+  </div>
+  <div class="max-w-[1300px] mx-auto px-6 pb-16 space-y-10">
+    <section id="landing-features" class="scroll-mt-24"><div class="flex items-end justify-between mb-4"><div><div class="text-[10px] uppercase tracking-[.2em] text-teal-300">Features</div><h2 class="font-display text-2xl mt-1">A sky that remembers with you.</h2></div></div><div class="grid md:grid-cols-3 gap-4"><article class="glass rounded-xl p-5"><div class="text-sm font-medium text-teal-200">Automated memory decay</div><p class="text-xs leading-5 text-slate-400 mt-2">SM-2 retention modelling turns elapsed time and review quality into a clear review signal before knowledge fades.</p></article><article class="glass rounded-xl p-5"><div class="text-sm font-medium text-indigo-200">GitHub signal ingestion</div><p class="text-xs leading-5 text-slate-400 mt-2">Practice evidence from commits can reinforce a skill’s activity timeline alongside intentional study logs.</p></article><article class="glass rounded-xl p-5"><div class="text-sm font-medium text-amber-200">Mentor check-ins</div><p class="text-xs leading-5 text-slate-400 mt-2">Invite a mentor to observe your constellation with read-only visibility into progress and retention risk.</p></article></div></section>
+    <section id="landing-technology" class="scroll-mt-24 glass rounded-xl p-6"><div class="text-[10px] uppercase tracking-[.2em] text-teal-300">Technology</div><h2 class="font-display text-2xl mt-1">Evidence, spaced repetition, and a living map.</h2><p class="text-xs leading-6 text-slate-400 max-w-3xl mt-3">Astraea combines learner-entered reviews with practice signals, calculates adaptive intervals through SM-2, and renders the result as an interactive celestial map. Retention curves make the next best review visible at a glance.</p></section>
+    <section id="landing-use-cases" class="scroll-mt-24 grid md:grid-cols-2 gap-4"><article class="glass rounded-xl p-5"><div class="text-[10px] uppercase tracking-[.2em] text-teal-300">Self-taught learners</div><p class="text-xs leading-5 text-slate-400 mt-2">Track programming, languages, creative practice, and every skill that deserves to stay lit.</p></article><article class="glass rounded-xl p-5"><div class="text-[10px] uppercase tracking-[.2em] text-amber-300">Mentors</div><p class="text-xs leading-5 text-slate-400 mt-2">Accept invitations and see a learner’s progress without changing their data or study history.</p></article></section>
+    <section id="landing-about" class="scroll-mt-24 glass rounded-xl p-6"><div class="text-[10px] uppercase tracking-[.2em] text-teal-300">About Astraea</div><p class="text-sm leading-6 text-slate-300 mt-2 max-w-3xl">Astraea is a celestial skill and retention tracker designed to prevent self-taught learning from quietly disappearing. Map what you know, record the practice that sustains it, and return to the skills that need you most.</p></section>
+  </div>
+</section>
+
+<!-- ======================================================= -->
+<!-- VIEW: AUTH SUITE (login / register w/ role selector) -->
+<!-- ======================================================= -->
+<section id="view-auth" class="view-section">
+  <div class="min-h-[85vh] flex items-center justify-center px-4 relative py-10">
+    <canvas id="authParticles" class="absolute inset-0 w-full h-full"></canvas>
+    <div class="relative glass rounded-2xl w-full max-w-md p-7 z-10">
+      <div class="flex justify-center mb-5" id="logoSlot1"></div>
+      <div class="flex rounded-full border border-white/10 p-1 mb-6 text-xs font-medium">
+        <button id="authTabLogin" class="flex-1 py-1.5 rounded-full transition" style="background:rgba(0,245,212,0.1); color:var(--teal)">Sign In</button>
+        <button id="authTabRegister" class="flex-1 py-1.5 rounded-full transition text-slate-400">Register</button>
+      </div>
+
+      <!-- LOGIN FIELDS -->
+      <div id="loginFields">
+        <button id="githubSignInBtn" class="w-full flex items-center justify-center gap-2 text-xs font-medium py-2.5 rounded-lg border border-white/15 hover:bg-white/5 mb-4">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.74.5 12.02c0 5.02 3.29 9.28 7.86 10.79.57.1.79-.25.79-.55 0-.27-.01-1.16-.02-2.11-3.2.7-3.87-1.36-3.87-1.36-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.17.08 1.78 1.2 1.78 1.2 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.56-.29-5.26-1.28-5.26-5.7 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.64 1.59.24 2.76.12 3.05.74.8 1.18 1.83 1.18 3.09 0 4.43-2.7 5.4-5.28 5.69.42.36.78 1.07.78 2.16 0 1.56-.02 2.82-.02 3.2 0 .3.21.66.8.55A10.53 10.53 0 0 0 23.5 12c0-6.28-5.22-11.5-11.5-11.5Z"/></svg>
+          Sign in with GitHub
+        </button>
+        <div class="flex items-center gap-3 mb-4"><div class="flex-1 h-px bg-white/10"></div><span class="text-[10px] text-slate-500">or continue with email</span><div class="flex-1 h-px bg-white/10"></div></div>
+        <div class="space-y-3">
+          <div><label class="text-[10px] uppercase tracking-wider text-slate-400">Email</label>
+            <input type="email" placeholder="you@example.com" class="w-full mt-1 bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-xs focus:border-teal-400/40"></div>
+          <div><label class="text-[10px] uppercase tracking-wider text-slate-400">Password</label><div class="relative"><input id="loginPassword" type="password" placeholder="••••••••" class="w-full mt-1 bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 pr-12 text-xs focus:border-teal-400/40"><button type="button" data-toggle-password="loginPassword" class="absolute right-2 top-2.5 text-[10px] text-teal-300">Show</button></div></div>
+        </div>
+      </div>
+
+      <!-- REGISTER FIELDS -->
+      <div id="registerFields" class="hidden">
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 mb-2">I am joining as a...</div>
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div class="role-card selected glass rounded-xl p-3 border border-white/10" data-role="learner">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00F5D4" stroke-width="1.8" class="mb-2"><path d="M12 2l2.9 6.6L22 9.3l-5 4.8L18.2 22 12 18.3 5.8 22 7 14.1l-5-4.8 7.1-.7L12 2z"/></svg>
+            <div class="text-xs font-semibold text-slate-200">Learner</div>
+            <div class="text-[10px] text-slate-400 mt-1">Track my skills, build star maps, and invite mentors.</div>
+          </div>
+          <div class="role-card glass rounded-xl p-3 border border-white/10" data-role="mentor">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB703" stroke-width="1.8" class="mb-2"><circle cx="12" cy="12" r="7"/><path d="M9 12l2 2 4-4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
+            <div class="text-xs font-semibold text-slate-200">Mentor</div>
+            <div class="text-[10px] text-slate-400 mt-1">Receive student invites and review read-only dashboards.</div>
+          </div>
+        </div>
+        <div class="space-y-3">
+          <div><label class="text-[10px] uppercase tracking-wider text-slate-400">Full Name</label>
+            <input type="text" placeholder="Your full name" class="w-full mt-1 bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-xs focus:border-teal-400/40"></div>
+          <div><label class="text-[10px] uppercase tracking-wider text-slate-400">Email</label>
+            <input type="email" placeholder="you@example.com" class="w-full mt-1 bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-xs focus:border-teal-400/40"></div>
+          <div><label class="text-[10px] uppercase tracking-wider text-slate-400">Password</label><div class="relative"><input id="registerPassword" type="password" placeholder="••••••••" class="w-full mt-1 bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 pr-12 text-xs focus:border-teal-400/40"><button type="button" data-toggle-password="registerPassword" class="absolute right-2 top-2.5 text-[10px] text-teal-300">Show</button></div></div>
+        </div>
+      </div>
+
+      <button id="authSubmit" class="navigate w-full text-xs font-semibold py-2.5 rounded-lg mt-4" style="background:var(--teal); color:#04140f">Sign In</button>
+      <p class="text-[10px] text-slate-500 text-center mt-4">Forgot your password? <span class="text-teal-300 cursor-default">Reset it here</span></p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================= -->
+<!-- VIEW: DASHBOARD (Celestial Skill Map) -->
+<!-- ======================================================= -->
+<section id="view-dashboard" class="view-section">
+  <div id="uranusInvitation" class="hidden max-w-[1300px] mx-auto px-4 pt-4"></div>
+  <div class="max-w-[1800px] mx-auto px-4 py-5">
+    <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
+      <div>
+        <h1 class="font-display text-2xl font-semibold">Celestial Skill Map</h1>
+        <p class="text-xs text-slate-400 mt-1">Drag to pan · scroll to zoom · click a star for details.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="glass rounded-lg px-3 py-1.5 text-center"><div class="text-[9px] uppercase text-slate-400">Total Stars Lit</div><div class="font-display text-sm font-semibold" style="color:var(--teal)" id="dashStatTotal">118</div></div>
+        <div class="glass rounded-lg px-3 py-1.5 text-center"><div class="text-[9px] uppercase text-slate-400">At-Risk Skills</div><div class="font-display text-sm font-semibold" style="color:var(--coral)" id="dashStatRisk">42</div></div>
+        <div class="glass rounded-lg px-3 py-1.5 text-center"><div class="text-[9px] uppercase text-slate-400">Stardust XP</div><div id="dashStatXp" class="font-display text-sm font-semibold" style="color:var(--amber)">0</div></div>
+        <button id="resetView" class="text-[11px] border border-white/15 rounded-lg px-3 py-2 hover:bg-white/5">Reset View</button>
+      </div>
+    </div>
+    <div class="relative rounded-2xl glass overflow-hidden" style="height:min(74vh,660px)">
+      <canvas id="skillCanvas" class="w-full h-full cursor-grab active:cursor-grabbing"></canvas>
+      <div id="tooltip" class="absolute opacity-0 z-20 glass rounded-lg px-3 py-2 text-xs pointer-events-none" style="min-width:150px"></div>
+      <div class="absolute bottom-3 left-3 flex items-center gap-4 text-[10px] text-slate-400">
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full" style="background:var(--teal);box-shadow:0 0 6px var(--teal)"></span>Fresh</span>
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full" style="background:var(--amber);box-shadow:0 0 6px var(--amber)"></span>Fading</span>
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full" style="background:var(--coral);box-shadow:0 0 6px var(--coral)"></span>At Risk</span>
+      </div>
+      <div class="absolute top-3 right-3 flex flex-col gap-1">
+        <span class="glass rounded-full px-2 py-0.5 text-[9px] uppercase tracking-wide text-slate-400">Software Engineering</span>
+        <span class="glass rounded-full px-2 py-0.5 text-[9px] uppercase tracking-wide text-slate-400">Languages &amp; Arts</span>
+      </div>
+      <button id="fabAddSkill" class="fab absolute bottom-5 right-5 w-14 h-14 rounded-full flex items-center justify-center text-2xl font-light" style="background:var(--teal); color:#04140f">+</button>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================= -->
+<!-- VIEW: REVIEW QUEUE -->
+<!-- ======================================================= -->
+<section id="view-queue" class="view-section">
+  <div class="max-w-3xl mx-auto px-4 py-6">
+    <h1 class="font-display text-2xl font-semibold">Review Queue</h1>
+    <p class="text-xs text-slate-400 mt-1 mb-5">Skills fading or at risk of being forgotten.</p>
+    <div id="queueList" class="space-y-3"></div>
+  </div>
+</section>
+
+<!-- ======================================================= -->
+<!-- VIEW: MANAGE SKILLS (CRUD) -->
+<!-- ======================================================= -->
+<section id="view-manage" class="view-section">
+  <div class="max-w-[1300px] mx-auto px-4 py-6">
+    <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
+      <div><h1 class="font-display text-2xl font-semibold">Manage Skills</h1><p class="text-xs text-slate-400 mt-1">Every skill you're tracking, in one table.</p></div>
+      <button id="openAddSkillSimple" class="text-xs font-medium px-4 py-2.5 rounded-lg" style="background:var(--teal); color:#04140f">+ Add New Skill</button>
+    </div>
+    <div class="glass rounded-xl p-4 mb-4 flex flex-wrap gap-3 items-center">
+      <input id="manageSearch" type="text" placeholder="Search skills..." class="bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-xs flex-1 min-w-[180px]">
+      <select id="manageCategory" class="bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-xs">
+        <option value="all">All Categories</option>
+        <option value="Software Engineering">Software Engineering</option>
+        <option value="Languages & Arts">Languages &amp; Arts</option>
+      </select>
+    </div>
+    <div class="glass rounded-xl overflow-x-auto">
+      <table class="w-full text-xs min-w-[640px]">
+        <thead><tr class="text-left text-[10px] uppercase tracking-wider text-slate-400 border-b border-white/10">
+          <th class="px-4 py-3">Skill</th><th class="px-4 py-3">Category</th><th class="px-4 py-3">Status</th>
+          <th class="px-4 py-3">EaseFactor</th><th class="px-4 py-3">Interval</th><th class="px-4 py-3 text-right">Actions</th>
+        </tr></thead>
+        <tbody id="manageTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================= -->
+<!-- VIEW: THE ABYSS -->
+<!-- ======================================================= -->
+<section id="view-abyss" class="view-section">
+  <div class="max-w-[1300px] mx-auto px-4 py-6">
+    <div class="flex items-center justify-between gap-3"><h1 class="font-display text-2xl font-semibold">The Black Hole</h1><button id="clearAbyssBtn" class="text-[11px] border border-rose-400/30 text-rose-300 rounded-full px-3 py-1.5 hover:bg-rose-400/10">Clear Abyss</button></div>
+    <p class="text-xs text-slate-400 mt-1 mb-4">Archived skills, kept in orbit — never deleted, always re-ignitable.</p>
+    <div class="relative rounded-2xl glass overflow-hidden" style="height:min(65vh,560px)">
+      <canvas id="abyssCanvas" class="w-full h-full"></canvas>
+      <div id="abyssEmpty" class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">Nothing archived yet. Archive a skill from the Celestial Map or Manage Skills table.</div>
+    </div>
+    <div id="abyssList" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4"></div>
+  </div>
+</section>
+
+<!-- ======================================================= -->
+<!-- VIEW: LEARNER MENTOR ACCESS SETTINGS -->
+<!-- ======================================================= -->
+<section id="view-mentorSettings" class="view-section">
+  <div class="max-w-4xl mx-auto px-4 py-6">
+    <h1 class="font-display text-2xl font-semibold">Mentor Access</h1>
+    <p class="text-xs text-slate-400 mt-1 mb-5">Control who can view your progress — always read-only.</p>
+    <div id="mentorReminderAlerts" class="space-y-2 mb-5"></div>
+
+    <div class="glass rounded-xl p-5 mb-5">
+      <div class="font-display font-semibold text-sm mb-3">Invite a Mentor</div>
+      <div class="flex flex-wrap gap-3 items-end">
+        <div class="flex-1 min-w-[220px]">
+          <label class="text-[10px] uppercase tracking-wider text-slate-400">Mentor Email</label>
+          <input id="inviteEmail" type="email" placeholder="mentor@example.com" class="w-full mt-1 bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-xs">
+        </div>
+        <button id="sendInviteBtn" class="text-xs font-semibold px-4 py-2.5 rounded-lg" style="background:var(--teal); color:#04140f">Send Invitation</button>
+      </div>
+      <div class="flex items-center gap-1.5 mt-3 text-[10px] text-slate-400">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Scope: Read-Only Dashboard Access
+      </div>
+    </div>
+
+    <div class="glass rounded-xl p-5 mb-5">
+      <div class="font-display font-semibold text-sm mb-3">Pending Invitations</div>
+      <div id="pendingInvitesTable" class="space-y-2"></div>
+    </div>
+
+    <div class="glass rounded-xl p-5">
+      <div class="font-display font-semibold text-sm mb-3">Active Mentors</div>
+      <div id="activeMentorsTable" class="space-y-2"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================= -->
+<!-- VIEW: MENTOR WORKSPACE -->
+<!-- ======================================================= -->
+<section id="view-mentorWorkspace" class="view-section">
+  <div class="max-w-[1300px] mx-auto px-4 py-6">
+    <h1 class="font-display text-2xl font-semibold">Mentor Workspace</h1>
+
+    <div class="glass rounded-xl p-5 mb-5">
+      <div class="font-display font-semibold text-sm mb-3">Incoming Student Invitations</div>
+      <div id="incomingInvitesList" class="space-y-2"></div>
+    </div>
+
+    <div>
+      <div class="font-display font-semibold text-sm mb-3">Active Mentees Workspace</div>
+      <div id="menteeGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================= -->
+<!-- VIEW: READ-ONLY MENTOR OBSERVER -->
+<!-- ======================================================= -->
+<section id="view-observer" class="view-section">
+  <div class="border-b border-amber-400/30" style="background:rgba(255,183,3,0.08)">
+    <div class="max-w-[1800px] mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2 text-[11px] font-medium" style="color:var(--amber)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+        READ-ONLY MENTOR OBSERVER MODE — Viewing Student: <span id="observerStudentName">Selected learner</span>
+      </div>
+      <button data-view="mentorWorkspace" class="navigate text-[11px] border border-white/15 rounded-full px-3 py-1.5 hover:bg-white/5">← Return to Workspace</button>
+    </div>
+  </div>
+  <div class="max-w-[1800px] mx-auto px-4 py-5">
+    <div class="grid lg:grid-cols-3 gap-4">
+      <div class="lg:col-span-2 relative rounded-2xl glass overflow-hidden" style="height:min(60vh,540px)">
+        <canvas id="observerCanvas" class="w-full h-full"></canvas>
+        <div id="observerTooltip" class="absolute opacity-0 z-20 glass rounded-lg px-3 py-2 text-xs pointer-events-none" style="min-width:150px"></div>
+        <div class="absolute bottom-3 left-3 flex items-center gap-4 text-[10px] text-slate-400">
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full" style="background:var(--teal)"></span>Fresh</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full" style="background:var(--amber)"></span>Fading</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full" style="background:var(--coral)"></span>At Risk</span>
+        </div>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 mb-2">Aggregate Retention</div>
+        <canvas id="observerChart" height="160"></canvas>
+        <div class="grid grid-cols-2 gap-2 mt-4">
+          <div class="rounded-lg border border-white/10 bg-white/[0.02] p-2.5 text-center"><div class="text-[9px] uppercase text-slate-400">Active Stars</div><div class="font-display text-base font-semibold" style="color:var(--teal)" id="observerStars">0</div></div>
+          <div class="rounded-lg border border-white/10 bg-white/[0.02] p-2.5 text-center"><div class="text-[9px] uppercase text-slate-400">Avg Retention</div><div class="font-display text-base font-semibold" style="color:var(--amber)" id="observerAvg">0%</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================= -->
+<!-- VIEW: REPORTS & ANALYTICS -->
+<!-- ======================================================= -->
+<section id="view-reports" class="view-section">
+  <div class="max-w-[1300px] mx-auto px-4 py-6">
+    <h1 class="font-display text-2xl font-semibold">Reports &amp; Analytics</h1>
+    <p class="text-xs text-slate-400 mt-1 mb-5">Aggregate retention trends and historical practice volume.</p>
+    <div class="grid lg:grid-cols-2 gap-4">
+      <div class="glass rounded-xl p-4"><div class="text-[10px] uppercase tracking-wider text-slate-400 mb-2">Aggregate Retention Trend (30 days)</div><canvas id="retentionTrendChart" height="220"></canvas></div>
+      <div class="glass rounded-xl p-4"><div class="text-[10px] uppercase tracking-wider text-slate-400 mb-2">Skill Retention Distribution</div><canvas id="volumeChart" height="220"></canvas></div>
+      <div class="glass rounded-xl p-4 lg:col-span-2"><div class="flex items-start justify-between gap-3 mb-3"><div><div class="text-[10px] uppercase tracking-wider text-slate-400">Retention by skill</div><div class="text-[11px] text-slate-500 mt-1">Monthly reviews: <span id="monthlyReviews" class="text-slate-200">0</span> · Longest streak: <span id="longestStreak" class="text-slate-200">0 days</span> · Average change: <span id="averageChange" class="text-slate-200">0%</span></div></div><button id="exportCsvBtn" class="text-[11px] rounded-full px-3 py-1.5 border border-teal-400/30 text-teal-300 hover:bg-teal-400/10">Export CSV</button></div><div class="overflow-x-auto"><table class="w-full text-left text-xs"><thead class="text-[9px] uppercase tracking-wider text-slate-500"><tr><th class="pb-2 pr-4">Skill</th><th class="pb-2 pr-4">Category</th><th class="pb-2 pr-4">Retention</th><th class="pb-2 pr-4">30-day change</th><th class="pb-2">Status</th></tr></thead><tbody id="reportSkillRows" class="divide-y divide-white/5"></tbody></table></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================= -->
+<!-- VIEW: GITHUB SETTINGS -->
+<!-- ======================================================= -->
+<section id="view-settings" class="view-section">
+  <div class="max-w-lg mx-auto px-4 py-10">
+    <h1 class="font-display text-2xl font-semibold mb-1">GitHub Integration</h1>
+    <p class="text-xs text-slate-400 mb-5">Connection status and sync controls.</p>
+    <div class="glass rounded-xl p-5">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-11 h-11 rounded-full flex items-center justify-center" style="background:rgba(0,245,212,0.1)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#00F5D4"><path d="M12 .5C5.73.5.5 5.74.5 12.02c0 5.02 3.29 9.28 7.86 10.79.57.1.79-.25.79-.55 0-.27-.01-1.16-.02-2.11-3.2.7-3.87-1.36-3.87-1.36-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.17.08 1.78 1.2 1.78 1.2 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.56-.29-5.26-1.28-5.26-5.7 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.64 1.59.24 2.76.12 3.05.74.8 1.18 1.83 1.18 3.09 0 4.43-2.7 5.4-5.28 5.69.42.36.78 1.07.78 2.16 0 1.56-.02 2.82-.02 3.2 0 .3.21.66.8.55A10.53 10.53 0 0 0 23.5 12c0-6.28-5.22-11.5-11.5-11.5Z"/></svg>
+        </div>
+        <div><div id="githubUsernameLabel" class="text-sm font-medium text-slate-200">Not connected</div>
+          <div id="githubStatusLabel" class="text-[11px] flex items-center gap-1.5 text-slate-400"><span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>Connect your own GitHub account</div></div>
+      </div>
+      <div class="mb-4">
+        <button id="connectGithubBtn" class="w-full text-xs font-semibold py-2.5 rounded-lg" style="background:var(--teal); color:#04140f">Connect with GitHub</button>
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-5">
+        <div class="rounded-lg border border-white/10 bg-white/[0.02] p-3"><div class="text-[9px] uppercase text-slate-400">Last Commit Sync</div><div id="lastSync" class="text-xs font-medium mt-1 text-slate-200">Never</div></div>
+        <div class="rounded-lg border border-white/10 bg-white/[0.02] p-3"><div class="text-[9px] uppercase text-slate-400">Repos Scanned</div><div id="reposScanned" class="text-xs font-medium mt-1 text-slate-200">0 repositories</div></div>
+      </div>
+      <button id="manualSyncBtn" class="w-full text-xs font-semibold py-2.5 rounded-lg border border-teal-400/30 text-teal-300 hover:bg-teal-400/10 transition">Trigger Manual Sync</button>
+      <button id="disconnectGithubBtn" class="w-full text-xs font-medium py-2.5 rounded-lg border border-white/15 hover:bg-white/5 mt-2">Disconnect GitHub</button>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ SKILL DETAIL DRAWER ============ -->
+<div id="drawerOverlay" class="fixed inset-0 bg-black/50 z-40 opacity-0 pointer-events-none modal-backdrop"></div>
+<aside id="drawer" class="drawer fixed top-0 right-0 h-full w-full max-w-md z-50 glass overflow-y-auto">
+  <div class="p-5">
+    <div class="flex items-start justify-between mb-4">
+      <div><span id="drawerCategory" class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border border-white/15 text-slate-300">Category</span>
+        <h2 id="drawerTitle" class="font-display text-xl font-semibold mt-2">Skill</h2></div>
+      <div class="flex items-center gap-2">
+        <button id="archiveBtn" class="text-[10px] border border-white/15 rounded-full px-3 py-1.5 hover:bg-white/5 whitespace-nowrap">Archive</button>
+        <button id="closeDrawer" class="w-7 h-7 rounded-full flex items-center justify-center border border-white/15 hover:bg-white/5">✕</button>
+      </div>
+    </div>
+    <div class="rounded-xl border border-white/10 bg-white/[0.02] p-3 mb-4">
+      <div class="text-[10px] uppercase tracking-wider text-slate-400 mb-2">Retention Decay</div>
+      <canvas id="drawerChart" height="140"></canvas>
+    </div>
+    <div class="grid grid-cols-3 gap-2 mb-4">
+      <div class="rounded-lg border border-white/10 bg-white/[0.02] p-2.5 text-center"><div class="text-[9px] uppercase text-slate-400">EaseFactor</div><div id="mEase" class="font-display text-base font-semibold" style="color:var(--teal)">2.50</div></div>
+      <div class="rounded-lg border border-white/10 bg-white/[0.02] p-2.5 text-center"><div class="text-[9px] uppercase text-slate-400">Interval</div><div id="mInterval" class="font-display text-base font-semibold">12d</div></div>
+      <div class="rounded-lg border border-white/10 bg-white/[0.02] p-2.5 text-center"><div class="text-[9px] uppercase text-slate-400">Next Due</div><div id="mDue" class="font-display text-base font-semibold" style="color:var(--amber)">—</div></div>
+    </div>
+    <div class="flex gap-2 mb-5">
+      <button id="logReviewBtn" class="flex-1 text-xs font-medium rounded-lg py-2 border border-teal-400/30 text-teal-300 hover:bg-teal-400/10">Log Review</button>
+      <button id="youtubeBtn" class="flex-1 text-xs font-medium rounded-lg py-2 border border-white/15 hover:bg-white/5">YouTube Refresher</button>
+    </div>
+    <div id="ytPanel" class="hidden mb-5 rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-2"></div>
+    <div><div class="text-[10px] uppercase tracking-wider text-slate-400 mb-2">Activity Timeline</div>
+      <div id="timeline" class="space-y-3 relative pl-4 border-l border-white/10"></div></div>
+  </div>
+</aside>
+
+<!-- ============ SIMPLE ADD SKILL MODAL (Manage view) ============ -->
+<div id="addSkillOverlay" class="fixed inset-0 bg-black/60 z-50 opacity-0 pointer-events-none modal-backdrop flex items-center justify-center px-4">
+  <div class="glass rounded-2xl w-full max-w-sm p-6">
+    <h3 class="font-display text-lg font-semibold mb-4">Add New Skill</h3>
+    <div class="space-y-3">
+      <div><label class="text-[10px] uppercase tracking-wider text-slate-400">Skill Name</label>
+        <input id="newSkillName" type="text" placeholder="e.g. Rust" class="w-full mt-1 bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-xs focus:border-teal-400/40"></div>
+      <div><label class="text-[10px] uppercase tracking-wider text-slate-400">Category</label><input id="newSkillCategory" list="constellationCategories" placeholder="Type a constellation category" class="w-full mt-1 bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-xs"></div>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button id="cancelAddSkill" class="flex-1 text-xs font-medium py-2.5 rounded-lg border border-white/15 hover:bg-white/5">Cancel</button>
+      <button id="confirmAddSkill" class="flex-1 text-xs font-semibold py-2.5 rounded-lg" style="background:var(--teal); color:#04140f">Add Skill</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ RICH "ADD SKILL CELESTIAL" MODAL (Dashboard FAB) ============ -->
+<div id="celestialModalOverlay" class="fixed inset-0 bg-black/60 z-50 opacity-0 pointer-events-none modal-backdrop flex items-center justify-center px-4 py-8 overflow-y-auto">
+  <div class="glass rounded-2xl w-full max-w-md p-6 my-auto">
+    <h3 class="font-display text-lg font-semibold mb-4">Add Skill to the Sky</h3>
+    <div class="space-y-4">
+      <div><label class="text-[10px] uppercase tracking-wider text-slate-400">Skill Title</label>
+        <input id="csTitle" type="text" placeholder="e.g. Rust" class="w-full mt-1 bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-xs focus:border-teal-400/40"></div>
+      <div><label class="text-[10px] uppercase tracking-wider text-slate-400">Constellation Category</label><input id="csCategory" list="constellationCategories" placeholder="Type or choose a constellation" class="w-full mt-1 bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-xs"></div>
+      <div>
+        <label class="text-[10px] uppercase tracking-wider text-slate-400">Current Confidence</label>
+        <div id="csStars" class="flex items-center gap-1 mt-1.5"></div>
+      </div>
+      <div><label class="text-[10px] uppercase tracking-wider text-slate-400">Weekly Target Hours</label>
+        <input id="csHours" type="number" min="1" max="40" value="3" class="w-full mt-1 bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-xs focus:border-teal-400/40"></div>
+      <div>
+        <label class="text-[10px] uppercase tracking-wider text-slate-400">Prerequisites (select any)</label>
+        <div id="csPrereqs" class="flex flex-wrap gap-1.5 mt-1.5"></div>
+      </div>
+    </div>
+    <div class="flex gap-2 mt-6">
+      <button id="cancelCelestial" class="flex-1 text-xs font-medium py-2.5 rounded-lg border border-white/15 hover:bg-white/5">Cancel</button>
+      <button id="confirmCelestial" class="flex-1 text-xs font-semibold py-2.5 rounded-lg" style="background:var(--teal); color:#04140f">Cast New Star</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ LOG REVIEW MODAL ============ -->
+<div id="logModalOverlay" class="fixed inset-0 bg-black/60 z-50 opacity-0 pointer-events-none modal-backdrop flex items-center justify-center px-4">
+  <div class="glass rounded-2xl w-full max-w-sm p-6">
+    <h3 class="font-display text-lg font-semibold mb-1">Log Review — <span id="logModalSkillName" style="color:var(--teal)"></span></h3>
+    <p class="text-xs text-slate-400 mb-4">This resets the decay clock and marks the skill fresh.</p>
+    <label class="text-[10px] uppercase tracking-wider text-slate-400">Notes (optional)</label>
+    <textarea id="logModalNotes" rows="3" placeholder="What did you review or practice?" class="w-full mt-1 bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-xs"></textarea>
+    <div class="flex gap-2 mt-5">
+      <button id="cancelLogModal" class="flex-1 text-xs font-medium py-2.5 rounded-lg border border-white/15 hover:bg-white/5">Cancel</button>
+      <button id="confirmLogModal" class="flex-1 text-xs font-semibold py-2.5 rounded-lg" style="background:var(--teal); color:#04140f">Mark as Reviewed</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ TOAST ============ -->
+<div id="toast" class="toast fixed bottom-5 left-1/2 -translate-x-1/2 z-[60] opacity-0 translate-y-4 pointer-events-none">
+  <div class="glass rounded-full px-4 py-2 text-xs flex items-center gap-2">
+    <span class="w-1.5 h-1.5 rounded-full" style="background:var(--teal)"></span><span id="toastText">Done.</span>
+  </div>
+</div>
+
+<datalist id="constellationCategories"><option value="Software Engineering"></option><option value="Languages & Arts"></option></datalist>
+<script>
+/* ================= LOGO INJECTION ================= */
+document.querySelectorAll('[id^="logoSlot"]').forEach(slot=> slot.appendChild(document.getElementById('logoTemplate').content.cloneNode(true)));
+
+/* ================= BACKGROUND STARFIELD ================= */
+const bg = document.getElementById('bgfield'); const bgx = bg.getContext('2d');
+let bgStars = [];
+function initBg(){ bg.width=innerWidth; bg.height=innerHeight;
+  bgStars = Array.from({length: Math.floor((innerWidth*innerHeight)/9500)}, ()=>({x:Math.random()*bg.width, y:Math.random()*bg.height, r:Math.random()*1.2+0.2, s:Math.random()*0.015+0.003, o:Math.random()})); }
+function drawBg(){ bgx.clearRect(0,0,bg.width,bg.height);
+  bgStars.forEach(st=>{ st.o+=st.s; const a=(Math.sin(st.o)+1)/2*0.7+0.15; bgx.fillStyle=`rgba(199,210,254,${a})`; bgx.beginPath(); bgx.arc(st.x,st.y,st.r,0,Math.PI*2); bgx.fill(); });
+  requestAnimationFrame(drawBg); }
+initBg(); drawBg(); window.addEventListener('resize', initBg);
+
+/* ================= HELPERS ================= */
+const STATUS_COLOR = { fresh:'#00F5D4', fading:'#FFB703', atrisk:'#E2574C' };
+const formatPercent = value => Number(value).toFixed(2);
+function starPts(cx,cy,oR,iR,rot){ const p=[]; for(let i=0;i<8;i++){ const r=i%2===0?oR:iR; const a=rot+i*Math.PI/4; p.push([cx+Math.cos(a)*r, cy+Math.sin(a)*r]); } return p; }
+function drawStar(ctx,cx,cy,oR,iR,color,glow){
+  const pts = starPts(cx,cy,oR,iR,-Math.PI/2);
+  ctx.save(); ctx.shadowColor=color; ctx.shadowBlur=glow; ctx.fillStyle=color;
+  ctx.beginPath(); pts.forEach(([x,y],i)=> i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)); ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function toast(msg){ const t=document.getElementById('toast'); document.getElementById('toastText').textContent=msg;
+  t.classList.remove('opacity-0','translate-y-4'); setTimeout(()=> t.classList.add('opacity-0','translate-y-4'), 2200); }
+function openModal(id){ document.getElementById(id).classList.remove('opacity-0','pointer-events-none'); }
+function closeModal(id){ document.getElementById(id).classList.add('opacity-0','pointer-events-none'); }
+
+/* ================= DATA MODEL ================= */
+const skills = [
+  { id:'js', name:'JavaScript', category:'Software Engineering', status:'fresh', ease:2.5, interval:'18 Days', due:'Sep 30', retention:88, x:0.30, y:0.42,
+    logs:[{type:'manual',text:'Logged manual review session',when:'2 days ago'},{type:'github',text:'GitHub commit detected in repo "js-playground"',when:'4 days ago'}] },
+  { id:'py', name:'Python', category:'Software Engineering', status:'fresh', ease:2.4, interval:'15 Days', due:'Sep 29', retention:84, x:0.16, y:0.55,
+    logs:[{type:'github',text:'GitHub commit detected in repo "python-ml"',when:'3 days ago'}] },
+  { id:'react', name:'React', category:'Software Engineering', status:'fading', ease:2.1, interval:'9 Days', due:'Sep 21', retention:58, x:0.38, y:0.62,
+    logs:[{type:'manual',text:'Marked reviewed after refresher video',when:'6 days ago'}] },
+  { id:'ts', name:'TypeScript', category:'Software Engineering', status:'atrisk', ease:1.6, interval:'3 Days', due:'Overdue', retention:24, x:0.24, y:0.28,
+    logs:[{type:'github',text:'GitHub commit detected in repo "ts-api"',when:'19 days ago'}] },
+  { id:'node', name:'Node.js', category:'Software Engineering', status:'fading', ease:2.0, interval:'8 Days', due:'Sep 20', retention:55, x:0.46, y:0.30,
+    logs:[{type:'github',text:'GitHub commit detected in repo "node-api"',when:'8 days ago'}] },
+  { id:'jp', name:'Japanese', category:'Languages & Arts', status:'fading', ease:2.0, interval:'8 Days', due:'Sep 19', retention:52, x:0.68, y:0.35,
+    logs:[{type:'manual',text:'Logged flashcard review session',when:'5 days ago'}] },
+  { id:'fr', name:'French', category:'Languages & Arts', status:'atrisk', ease:1.5, interval:'2 Days', due:'Overdue', retention:19, x:0.82, y:0.25,
+    logs:[{type:'manual',text:'Logged conversation practice',when:'21 days ago'}] },
+  { id:'figma', name:'Figma', category:'Languages & Arts', status:'fresh', ease:2.6, interval:'20 Days', due:'Oct 5', retention:90, x:0.72, y:0.58,
+    logs:[{type:'manual',text:'Logged prototyping session',when:'1 day ago'}] },
+  { id:'paint', name:'Watercolor Painting', category:'Languages & Arts', status:'atrisk', ease:1.5, interval:'2 Days', due:'Overdue', retention:16, x:0.88, y:0.68,
+    logs:[{type:'manual',text:'Logged practice session',when:'25 days ago'}] },
+];
+const connections = [['js','py'],['js','react'],['js','ts'],['react','node'],['jp','fr'],['figma','paint']];
+let learnerMapReady = false;
+const archived = [];
+const yt = {
+  js:['Closures Explained in 6 Minutes','Async/Await Patterns'], py:['Generators Deep Dive','List Comprehensions Refresher'],
+  react:['React Hooks Refresher','useEffect Pitfalls'], ts:['TypeScript Generics in 10 Minutes','Utility Types Refresher'],
+  node:['Event Loop Refresher','Streams Explained'], jp:['N4 Grammar Refresher','100 Common Kanji Review'],
+  fr:['Subjunctive Refresher','Everyday Conversation Drills'], figma:['Auto Layout Refresher','Component Variants'],
+  paint:['Wet-on-Wet Technique Refresher','Color Mixing Basics'],
+};
+
+/* mentor / invitation state from API only */
+let pendingInvites = [];
+let activeMentors = [];
+let incomingInvites = [];
+let activeMentees = [];
+let selectedObserverLearnerId = null;
+let observerSkills = [];
+let observerConnections = [];
+
+function computeStats(){
+  const risk = skills.filter(s=>s.status==='atrisk').length;
+  document.getElementById('dashStatRisk').textContent = risk;
+  document.getElementById('dashStatTotal').textContent = skills.length;
+  document.getElementById('dashStatXp').textContent = Math.round(skills.reduce((total,skill)=>total+skill.retention,0));
+}
+computeStats();
+
+document.querySelectorAll('[data-toggle-password]').forEach(button=>button.addEventListener('click',()=>{const input=document.getElementById(button.dataset.togglePassword);const hidden=input.type==='password';input.type=hidden?'text':'password';button.textContent=hidden?'Hide':'Show';}));
+function rememberConstellation(category){
+  const clean=category.trim(); if(!clean) return null;
+  const list=document.getElementById('constellationCategories');
+  if(![...list.options].some(option=>option.value.toLowerCase()===clean.toLowerCase())){const option=document.createElement('option');option.value=clean;list.appendChild(option);const saved=JSON.parse(localStorage.getItem('astraea.constellations')||'[]');localStorage.setItem('astraea.constellations',JSON.stringify([...saved,clean]));}
+  return clean;
+}
+JSON.parse(localStorage.getItem('astraea.constellations')||'[]').forEach(rememberConstellation);
+
+/* ================= ROUTER ================= */
+const views = ['landing','auth','dashboard','queue','manage','abyss','mentorSettings','mentorWorkspace','observer','reports','settings'];
+function showView(name){
+  views.forEach(v=> document.getElementById('view-'+v).classList.toggle('active', v===name));
+  document.querySelectorAll('.navtab').forEach(b=> b.classList.toggle('active', b.dataset.view===name));
+  document.querySelectorAll('.mobile-navtab').forEach(b=> b.classList.toggle('active', b.dataset.view===name));
+  closeMobileMenu();
+  if(name==='dashboard'){ resizeSkillCanvas(); loadPersistedSkills(); }
+  if(name==='abyss'){ resizeAbyss(); renderAbyssList(); abyssRunning=true; requestAnimationFrame(drawAbyss); } else { abyssRunning=false; }
+  if(name==='queue') renderQueue();
+  if(name==='manage') renderManageTable();
+  if(name==='mentorSettings') renderMentorSettings();
+  if(name==='mentorWorkspace') renderMentorWorkspace();
+  if(name==='reports') renderReports();
+  if(name==='settings') renderGitHubSettings();
+  if(name==='auth') resizeAuthParticles();
+  if(name==='observer') { resizeObserverCanvas(); renderObserver(); }
+}
+document.querySelectorAll('[data-view]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    if(btn.dataset.register){ showView('auth'); document.getElementById('authTabRegister').click(); return; }
+    showView(btn.dataset.view);
+  });
+});
+function closeMobileMenu(){document.body.classList.remove('mobile-menu-open');document.getElementById('mobileMenuBtn')?.setAttribute('aria-expanded','false');}
+function buildMobileNav(){
+  const host=document.getElementById('mobileNavItems'); if(!host) return;
+  host.innerHTML='';
+  document.querySelectorAll('#navTabs [data-view]').forEach(source=>{
+    const button=document.createElement('button');
+    button.type='button';
+    button.dataset.view=source.dataset.view;
+    button.className='mobile-navtab navtab text-left text-xs font-medium px-3 py-2 rounded-lg border border-white/10';
+    button.textContent=source.textContent;
+    button.addEventListener('click',()=>showView(button.dataset.view));
+    host.appendChild(button);
+  });
+}
+buildMobileNav();
+document.getElementById('mobileMenuBtn').addEventListener('click',e=>{e.stopPropagation();const open=document.body.classList.toggle('mobile-menu-open');e.currentTarget.setAttribute('aria-expanded',open?'true':'false');});
+document.addEventListener('click',e=>{if(!document.getElementById('mobileNavPanel').contains(e.target)&&!document.getElementById('mobileMenuBtn').contains(e.target))closeMobileMenu();});
+
+/* ================= HERO MINI CANVAS (Landing) ================= */
+const heroCanvas = document.getElementById('heroCanvas'); const heroCtx = heroCanvas.getContext('2d');
+const heroNodes = [
+  {x:0.2,y:0.3,c:'#00F5D4'},{x:0.4,y:0.55,c:'#00F5D4'},{x:0.6,y:0.3,c:'#FFB703'},
+  {x:0.75,y:0.6,c:'#E2574C'},{x:0.85,y:0.25,c:'#FFB703'},{x:0.3,y:0.75,c:'#00F5D4'}
+];
+let mouseXHero=0.5, mouseYHero=0.5;
+function resizeHero(){ const r = heroCanvas.parentElement.getBoundingClientRect();
+  heroCanvas.width=r.width*devicePixelRatio; heroCanvas.height=r.height*devicePixelRatio;
+  heroCanvas.style.width=r.width+'px'; heroCanvas.style.height=r.height+'px';
+  heroCtx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); }
+heroCanvas.addEventListener('mousemove', e=>{ const r=heroCanvas.getBoundingClientRect(); mouseXHero=(e.clientX-r.left)/r.width; mouseYHero=(e.clientY-r.top)/r.height; });
+function drawHero(){
+  const w = heroCanvas.width/devicePixelRatio, h = heroCanvas.height/devicePixelRatio;
+  heroCtx.clearRect(0,0,w,h);
+  const dx = (mouseXHero-0.5)*14, dy=(mouseYHero-0.5)*14;
+  heroCtx.setLineDash([4,4]); heroCtx.strokeStyle='rgba(199,210,254,0.2)';
+  for(let i=0;i<heroNodes.length-1;i++){ const a=heroNodes[i], b=heroNodes[i+1];
+    heroCtx.beginPath(); heroCtx.moveTo(a.x*w+dx*0.4, a.y*h+dy*0.4); heroCtx.lineTo(b.x*w+dx*0.4, b.y*h+dy*0.4); heroCtx.stroke(); }
+  heroCtx.setLineDash([]);
+  heroNodes.forEach(n=> drawStar(heroCtx, n.x*w+dx, n.y*h+dy, 9, 3.6, n.c, 14));
+  requestAnimationFrame(drawHero);
+}
+new ResizeObserver(resizeHero).observe(heroCanvas.parentElement);
+resizeHero(); drawHero();
+
+/* ================= AUTH PARTICLES & ROLE SELECT ================= */
+const authCanvas = document.getElementById('authParticles'); const authCtx = authCanvas.getContext('2d');
+let authParticles = [];
+function resizeAuthParticles(){ const r = authCanvas.getBoundingClientRect();
+  authCanvas.width = r.width*devicePixelRatio; authCanvas.height = r.height*devicePixelRatio;
+  authCtx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  authParticles = Array.from({length:60}, ()=>({x:Math.random()*r.width, y:Math.random()*r.height, r:Math.random()*1.5+0.3, s:Math.random()*0.3+0.1})); }
+function drawAuthParticles(){
+  const w = authCanvas.width/devicePixelRatio, h = authCanvas.height/devicePixelRatio;
+  authCtx.clearRect(0,0,w,h);
+  authParticles.forEach(p=>{ p.y -= p.s; if(p.y<0) p.y=h; authCtx.fillStyle='rgba(0,245,212,0.4)'; authCtx.beginPath(); authCtx.arc(p.x,p.y,p.r,0,Math.PI*2); authCtx.fill(); });
+  requestAnimationFrame(drawAuthParticles);
+}
+drawAuthParticles();
+
+let selectedRole = 'learner';
+document.querySelectorAll('.role-card').forEach(card=>{
+  card.addEventListener('click', ()=>{
+    document.querySelectorAll('.role-card').forEach(c=>c.classList.remove('selected'));
+    card.classList.add('selected'); selectedRole = card.dataset.role;
+  });
+});
+function setAuthMode(mode){
+  const isLogin = mode==='login';
+  document.getElementById('authTabLogin').style.background = isLogin?'rgba(0,245,212,0.1)':''; document.getElementById('authTabLogin').style.color = isLogin?'var(--teal)':'#94a3b8';
+  document.getElementById('authTabRegister').style.background = !isLogin?'rgba(0,245,212,0.1)':''; document.getElementById('authTabRegister').style.color = !isLogin?'var(--teal)':'#94a3b8';
+  document.getElementById('loginFields').classList.toggle('hidden', !isLogin);
+  document.getElementById('registerFields').classList.toggle('hidden', isLogin);
+  document.getElementById('authSubmit').textContent = isLogin ? 'Sign In' : 'Create Account';
+  document.getElementById('authSubmit').dataset.view = isLogin ? 'dashboard' : '';
+}
+document.getElementById('authTabLogin').addEventListener('click', ()=> setAuthMode('login'));
+document.getElementById('authTabRegister').addEventListener('click', ()=> setAuthMode('register'));
+document.getElementById('authSubmit').addEventListener('click', async function(){
+  const isRegister = !document.getElementById('registerFields').classList.contains('hidden');
+  const inputs=[...(isRegister?document.querySelectorAll('#registerFields input'):document.querySelectorAll('#loginFields input'))];
+  const body=isRegister?{fullName:inputs[0].value.trim(),email:inputs[1].value.trim(),password:inputs[2].value,role:selectedRole==='mentor'?1:0}:{email:inputs[0].value.trim(),password:inputs[1].value};
+  if(!body.email||!body.password||(isRegister&&!body.fullName)){toast('Complete all required fields.');return;}
+  this.disabled=true;
+  try { const session=await astraeaApi('/api/auth/'+(isRegister?'register':'login'),{method:'POST',body:JSON.stringify(body)}); localStorage.setItem('astraea.session',JSON.stringify(session)); await loadPersistedSkills(); applyRoleVisibility(session); showView(session.role==='Mentor'?'mentorWorkspace':'dashboard'); toast('Welcome to Astraea, '+session.fullName+'.'); }
+  catch(error){toast(error.message);} finally {this.disabled=false;}
+});
+document.getElementById('githubSignInBtn').addEventListener('click',async function(){
+  this.disabled=true; this.textContent='Opening GitHub...';
+  try{const start=await astraeaApi('/api/auth/github/start',{method:'POST'});window.location.href=start.authorizationUrl;}
+  catch(error){toast(error.message.includes('GitHub OAuth is not configured')?'GitHub OAuth keys are missing in appsettings.':error.message);}
+  finally{this.disabled=false;this.textContent='Sign in with GitHub';}
+});
+document.querySelectorAll('#loginFields input,#registerFields input').forEach(input=>input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.getElementById('authSubmit').click();}}));
+
+/* ================= DASHBOARD CANVAS (pan/zoom) ================= */
+const canvas = document.getElementById('skillCanvas'); const ctx = canvas.getContext('2d');
+let hoverId=null, panX=0, panY=0, zoom=1, isDragging=false, lastX=0, lastY=0, pulseT=0;
+function resizeSkillCanvas(){ const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width*devicePixelRatio; canvas.height = rect.height*devicePixelRatio;
+  canvas.style.width=rect.width+'px'; canvas.style.height=rect.height+'px';
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); }
+function worldPos(s,w,h,px,py,z){ return { x:(s.x*w)*z+px, y:(s.y*h)*z+py }; }
+function drawMap(){
+  if(!document.getElementById('view-dashboard').classList.contains('active')) return requestAnimationFrame(drawMap);
+  const w = canvas.width/devicePixelRatio, h = canvas.height/devicePixelRatio;
+  const currentSession=JSON.parse(localStorage.getItem('astraea.session')||'null');
+  if(currentSession?.role==='Learner'&&!learnerMapReady){ctx.clearRect(0,0,w,h);return requestAnimationFrame(drawMap);}
+  ctx.clearRect(0,0,w,h); pulseT += 0.035;
+  ctx.setLineDash([4,4]);
+  connections.forEach(([a,b])=>{
+    const sA=skills.find(s=>s.id===a), sB=skills.find(s=>s.id===b); if(!sA||!sB) return;
+    const pA=worldPos(sA,w,h,panX,panY,zoom), pB=worldPos(sB,w,h,panX,panY,zoom);
+    ctx.beginPath(); ctx.moveTo(pA.x,pA.y); ctx.lineTo(pB.x,pB.y); ctx.strokeStyle='rgba(199,210,254,0.25)'; ctx.lineWidth=1; ctx.stroke(); });
+  ctx.setLineDash([]);
+  skills.forEach(s=>{
+    const p = worldPos(s,w,h,panX,panY,zoom); const isHover = hoverId===s.id;
+    const phase=[...String(s.id)].reduce((sum,char)=>sum+char.charCodeAt(0),0)*0.13;
+    const amplitude=s.status==='fresh'?0.7:s.status==='fading'?1.2:1.7;
+    const baseRadius=(isHover?13:10)*Math.min(zoom,1.6);
+    let oR = baseRadius+Math.sin(pulseT*2+phase)*amplitude;
+    const glow=(isHover?22:14)+Math.sin(pulseT*2+phase)*2;
+    drawStar(ctx,p.x,p.y,oR,oR*0.42, STATUS_COLOR[s.status], glow);
+    ctx.fillStyle='#C7D2FE'; ctx.font='600 12px Space Grotesk, sans-serif'; ctx.textAlign='center'; ctx.fillText(s.name, p.x, p.y+baseRadius+16);
+  });
+  requestAnimationFrame(drawMap);
+}
+function nodeAt(mx,my){ const w = canvas.width/devicePixelRatio, h = canvas.height/devicePixelRatio;
+  for(const s of skills){ const p=worldPos(s,w,h,panX,panY,zoom); if(Math.hypot(mx-p.x,my-p.y)<18) return s; } return null; }
+canvas.addEventListener('mousedown', e=>{ isDragging=true; lastX=e.clientX; lastY=e.clientY; });
+window.addEventListener('mouseup', ()=> isDragging=false);
+canvas.addEventListener('mousemove', e=>{
+  const rect = canvas.getBoundingClientRect(); const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  if(isDragging){ panX += e.clientX-lastX; panY += e.clientY-lastY; lastX=e.clientX; lastY=e.clientY; document.getElementById('tooltip').style.opacity=0; return; }
+  const hit = nodeAt(mx,my); const tip = document.getElementById('tooltip');
+  if(hit){ hoverId=hit.id; canvas.style.cursor='pointer'; tip.style.opacity=1;
+    tip.style.left = Math.min(mx+14, rect.width-160)+'px'; tip.style.top = Math.max(my-46,4)+'px';
+    tip.innerHTML = `<div class="font-display font-semibold text-xs" style="color:${STATUS_COLOR[hit.status]}">${hit.name}</div><div class="text-[10px] text-slate-400 mt-0.5">${hit.category} · ${formatPercent(hit.retention)}% retention</div>`;
+  } else { hoverId=null; canvas.style.cursor='grab'; tip.style.opacity=0; }
+});
+canvas.addEventListener('click', e=>{
+  if(Math.abs(e.clientX-lastX)>3 || Math.abs(e.clientY-lastY)>3) return;
+  const rect = canvas.getBoundingClientRect(); const hit = nodeAt(e.clientX-rect.left, e.clientY-rect.top);
+  if(hit) openDrawer(hit.id);
+});
+canvas.addEventListener('wheel', e=>{ e.preventDefault(); const factor = e.deltaY<0 ? 1.08 : 0.93; zoom = Math.min(2.4, Math.max(0.5, zoom*factor)); }, {passive:false});
+document.getElementById('resetView').addEventListener('click', ()=>{ panX=0; panY=0; zoom=1; });
+new ResizeObserver(resizeSkillCanvas).observe(canvas.parentElement);
+requestAnimationFrame(drawMap);
+
+/* ================= DRAWER ================= */
+const drawer = document.getElementById('drawer'); const overlay = document.getElementById('drawerOverlay');
+let activeSkillId = null; let drawerChart = null;
+function renderDrawerChart(skill){
+  const interval=skill.intervalDays||Math.max(1,parseInt(skill.interval,10)||7); const elapsed=Math.max(0,-interval*Math.log(Math.max(.01,skill.retention)/100));
+  const steps=Math.max(6,Math.ceil(elapsed)+1); const labels=[]; const vals=[]; for(let day=0;day<=steps;day++){labels.push(day===0?'Review':day===steps?'Today':'Day '+day);vals.push(Math.round(100*Math.exp(-Math.max(0,elapsed-steps+day)/interval)*10)/10);}
+  const status=skill.status||(skill.retention>=70?'fresh':skill.retention>=40?'fading':'atrisk'); const el = document.getElementById('drawerChart'); if(drawerChart) drawerChart.destroy();
+  drawerChart = new Chart(el, { type:'line', data:{ labels, datasets:[{
+    data:vals, borderColor:STATUS_COLOR[status], backgroundColor:STATUS_COLOR[status]+'22', fill:true, tension:0.35, pointBackgroundColor:STATUS_COLOR[status], pointRadius:3, borderWidth:2 }]},
+    options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#64748b', font:{size:9}}, grid:{color:'rgba(199,210,254,0.06)'}},
+      y:{ticks:{color:'#64748b', font:{size:9}}, grid:{color:'rgba(199,210,254,0.06)'}, min:0, max:100 } } } });
+}
+function renderTimeline(skill){
+  document.getElementById('timeline').innerHTML = skill.logs.map(l=>`
+    <div class="relative pl-4"><span class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full" style="background:${l.type==='github'?'#818cf8':'#00F5D4'}"></span>
+      <div class="text-xs text-slate-200">${l.text}</div><div class="text-[10px] text-slate-500">${l.when}</div></div>`).join('') || `<div class="text-xs text-slate-500 pl-4">No activity logged yet.</div>`;
+}
+function openDrawer(id){
+  const skill = skills.find(s=>s.id===id); if(!skill) return; activeSkillId=id;
+  document.getElementById('drawerTitle').textContent = skill.name;
+  document.getElementById('drawerCategory').textContent = skill.category;
+  document.getElementById('mEase').textContent = skill.ease.toFixed(2);
+  document.getElementById('mInterval').textContent = skill.interval;
+  const due = document.getElementById('mDue'); due.textContent = skill.due; due.style.color = skill.due==='Overdue' ? '#E2574C' : '#FFB703';
+  renderDrawerChart(skill); renderTimeline(skill);
+  document.getElementById('ytPanel').classList.add('hidden'); document.getElementById('ytPanel').innerHTML='';
+  drawer.classList.add('open'); overlay.classList.remove('opacity-0','pointer-events-none');
+}
+function closeDrawerFn(){ drawer.classList.remove('open'); overlay.classList.add('opacity-0','pointer-events-none'); activeSkillId=null; }
+document.getElementById('closeDrawer').addEventListener('click', closeDrawerFn);
+overlay.addEventListener('click', closeDrawerFn);
+document.getElementById('logReviewBtn').addEventListener('click', async ()=>{
+  const skill = skills.find(s=>s.id===activeSkillId); if(!skill) return;
+  try{await astraeaApi('/api/studylogs',{method:'POST',body:JSON.stringify({skillId:skill.id,studiedAtUtc:new Date().toISOString(),selfRating:5,notes:'Reviewed from skill detail'})});}catch(error){toast(error.message);return;}
+  skill.logs.unshift({type:'manual', text:'Logged manual review session', when:'Just now'});
+  skill.status='fresh'; skill.ease=Math.min(2.6, skill.ease+0.2); skill.interval='18 Days'; skill.due='in 18 days'; skill.retention=90;
+  renderTimeline(skill); renderDrawerChart(skill);
+  document.getElementById('mEase').textContent = skill.ease.toFixed(2);
+  document.getElementById('mInterval').textContent = skill.interval;
+  document.getElementById('mDue').textContent = skill.due; document.getElementById('mDue').style.color='#FFB703';
+  computeStats(); toast(skill.name+' marked as reviewed.');
+});
+document.getElementById('youtubeBtn').addEventListener('click', async ()=>{
+  const panel = document.getElementById('ytPanel');
+  if(!activeSkillId) return;
+  if(!panel.classList.contains('hidden')){panel.classList.add('hidden');return;}
+  panel.innerHTML = `<div class="text-xs text-slate-400">Loading refresher links...</div>`;
+  panel.classList.remove('hidden');
+  try{
+    const links=await astraeaApi('/api/refresher-content/skills/'+activeSkillId);
+    panel.innerHTML = links.map(v=>`<a target="_blank" rel="noopener noreferrer" href="${v.url}" class="flex items-center gap-2 text-xs rounded-md p-1.5 hover:bg-white/5"><span style="color:#E2574C">▶</span><span class="text-slate-200">${v.title}</span><span class="ml-auto text-[10px] text-teal-300">Open ↗</span></a>`).join('');
+  }catch(error){
+    const vids = yt[activeSkillId]||[];
+    panel.innerHTML = vids.length ? vids.map(v=>`<a target="_blank" rel="noopener noreferrer" href="https://www.youtube.com/results?search_query=${encodeURIComponent(v)}" class="flex items-center gap-2 text-xs rounded-md p-1.5 hover:bg-white/5"><span style="color:#E2574C">▶</span><span class="text-slate-200">${v}</span><span class="ml-auto text-[10px] text-teal-300">Open ↗</span></a>`).join('') : `<div class="text-xs text-slate-500">${error.message}</div>`;
+  }
+});
+document.getElementById('archiveBtn').addEventListener('click', async ()=>{
+  const idx = skills.findIndex(s=>s.id===activeSkillId); if(idx===-1) return;
+  try{await astraeaApi('/api/skills/'+skills[idx].id+'/archive',{method:'POST'});}catch(error){toast(error.message);return;}
+  const [skill] = skills.splice(idx,1); archived.push(skill); closeDrawerFn(); computeStats(); toast(skill.name+' cast into the Abyss.');
+});
+
+/* ================= FAB: RICH ADD SKILL CELESTIAL MODAL ================= */
+let csRating = 3;
+function renderCsStars(){
+  document.getElementById('csStars').innerHTML = [1,2,3,4,5].map(i=>`
+    <svg data-i="${i}" class="star-pick" width="22" height="22" viewBox="0 0 24 24" fill="${i<=csRating?'#FFB703':'none'}" stroke="#FFB703" stroke-width="1.5">
+      <path d="M12 2l2.9 6.6L22 9.3l-5 4.8L18.2 22 12 18.3 5.8 22 7 14.1l-5-4.8 7.1-.7L12 2z"/></svg>`).join('');
+  document.querySelectorAll('#csStars .star-pick').forEach(star=> star.addEventListener('click', ()=>{ csRating = parseInt(star.dataset.i); renderCsStars(); }));
+}
+let csSelectedPrereqs = [];
+function renderCsPrereqs(){
+  document.getElementById('csPrereqs').innerHTML = skills.map(s=>`
+    <span data-id="${s.id}" class="prereq-chip ${csSelectedPrereqs.includes(s.id)?'selected':''} text-[10px] px-2.5 py-1 rounded-full border border-white/15">${s.name}</span>`).join('');
+  document.querySelectorAll('.prereq-chip').forEach(chip=> chip.addEventListener('click', ()=>{
+    const id = chip.dataset.id;
+    csSelectedPrereqs = csSelectedPrereqs.includes(id) ? csSelectedPrereqs.filter(x=>x!==id) : [...csSelectedPrereqs, id];
+    renderCsPrereqs();
+  }));
+}
+document.getElementById('fabAddSkill').addEventListener('click', ()=>{
+  document.getElementById('csTitle').value=''; csRating=3; csSelectedPrereqs=[];
+  renderCsStars(); renderCsPrereqs(); openModal('celestialModalOverlay');
+});
+document.getElementById('cancelCelestial').addEventListener('click', ()=> closeModal('celestialModalOverlay'));
+document.getElementById('celestialModalOverlay').addEventListener('click', e=>{ if(e.target.id==='celestialModalOverlay') closeModal('celestialModalOverlay'); });
+function localSkillFromNode(node,hours=0){const status=node.riskStatus===0||node.riskStatus==='Fresh'?'fresh':node.riskStatus===1||node.riskStatus==='Fading'?'fading':'atrisk';return{id:node.id,name:node.title,category:node.constellationCategory,status,ease:node.easeFactor,interval:node.currentIntervalDays+' Days',intervalDays:node.currentIntervalDays,due:'in '+node.currentIntervalDays+' days',retention:node.retentionPercent,x:node.canvasX,y:node.canvasY,prerequisiteSkillIds:node.prerequisiteSkillIds||[],logs:[{type:'manual',text:`Skill added — target ${hours}h/week`,when:'Just now'}]};}
+async function persistSkill(name,category,rating,hours,prerequisiteSkillIds=[]){const node=await astraeaApi('/api/skills',{method:'POST',body:JSON.stringify({title:name,constellationCategory:category,initialRating:rating,targetWeeklyHours:Number(hours)||0,prerequisiteSkillIds})});const skill=localSkillFromNode(node,hours);skills.push(skill);return skill;}
+document.getElementById('confirmCelestial').addEventListener('click', async ()=>{
+  const name = document.getElementById('csTitle').value.trim();
+  if(!name){ toast('Give the star a title first.'); return; }
+  const category = rememberConstellation(document.getElementById('csCategory').value); if(!category){toast('Name this constellation category first.');return;}
+  const hours = document.getElementById('csHours').value;
+  try {const skill=await persistSkill(name,category,csRating,hours,csSelectedPrereqs);csSelectedPrereqs.forEach(pid=>connections.push([pid,skill.id]));closeModal('celestialModalOverlay');computeStats();toast(name+' cast into the sky.');}catch(error){toast(error.message);}
+});
+document.querySelectorAll('#csTitle,#csCategory,#csHours').forEach(input=>input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.getElementById('confirmCelestial').click();}}));
+
+/* ================= REVIEW QUEUE ================= */
+let logModalSkillId = null;
+function renderQueue(){
+  const list = document.getElementById('queueList'); const due = skills.filter(s=>s.status!=='fresh');
+  if(!due.length){ list.innerHTML = `<div class="text-sm text-slate-500">Everything's fresh. Nothing due for review.</div>`; return; }
+  list.innerHTML = due.map(s=>`
+    <div class="rounded-xl border p-4 flex items-center justify-between gap-4" style="background:linear-gradient(90deg, ${s.status==='fading'?'rgba(255,183,3,0.08)':'rgba(226,87,76,0.08)'}, transparent); border-color:rgba(199,210,254,0.1)">
+      <div class="flex items-start gap-3">
+        <span class="mt-1 text-lg" style="color:${STATUS_COLOR[s.status]}">${s.status==='fading'?'★':'▲'}</span>
+        <div><div class="font-display font-semibold text-sm">${s.name}</div>
+          <div class="text-xs text-slate-400 mt-0.5">${s.status==='fading'?'Quick refresher due soon.':'Rapid decay — due now.'}</div>
+          <div class="text-[10px] text-slate-500 mt-1">⏱ ${s.due} · ${formatPercent(s.retention)}% retention</div></div>
+      </div>
+      <div class="flex flex-col gap-1.5 shrink-0">
+        <button data-id="${s.id}" class="markReviewed text-[11px] font-medium rounded-full border border-white/15 px-3 py-1.5 hover:bg-white/5">Mark as Reviewed</button>
+        <button data-id="${s.id}" class="viewYT text-[11px] text-slate-400 hover:text-slate-200">View YouTube Refresher</button>
+      </div>
+    </div>`).join('');
+  document.querySelectorAll('.markReviewed').forEach(btn=> btn.addEventListener('click', e=>{
+    logModalSkillId = e.target.dataset.id;
+    document.getElementById('logModalSkillName').textContent = skills.find(s=>s.id===logModalSkillId).name;
+    document.getElementById('logModalNotes').value=''; openModal('logModalOverlay');
+  }));
+  document.querySelectorAll('.viewYT').forEach(btn=> btn.addEventListener('click', async e=>{
+    const s = skills.find(x=>x.id===e.target.dataset.id); if(!s) return;
+    try{const links=await astraeaApi('/api/refresher-content/skills/'+s.id); if(links.length) window.open(links[0].url,'_blank','noopener');}
+    catch{const search=(yt[s.id]||[])[0]||`${s.name} refresher`; window.open('https://www.youtube.com/results?search_query='+encodeURIComponent(search),'_blank','noopener');}
+  }));
+}
+document.getElementById('cancelLogModal').addEventListener('click', ()=> closeModal('logModalOverlay'));
+document.getElementById('logModalOverlay').addEventListener('click', e=>{ if(e.target.id==='logModalOverlay') closeModal('logModalOverlay'); });
+document.getElementById('confirmLogModal').addEventListener('click', async ()=>{
+  const skill = skills.find(s=>s.id===logModalSkillId); if(!skill) return;
+  const notes = document.getElementById('logModalNotes').value.trim();
+  try{await astraeaApi('/api/studylogs',{method:'POST',body:JSON.stringify({skillId:skill.id,studiedAtUtc:new Date().toISOString(),selfRating:5,notes})});}catch(error){toast(error.message);return;}
+  skill.logs.unshift({type:'manual', text: notes ? 'Logged review: "'+notes+'"' : 'Marked reviewed from Review Queue', when:'Just now'});
+  skill.status='fresh'; skill.ease=Math.min(2.6, skill.ease+0.2); skill.interval='18 Days'; skill.due='in 18 days'; skill.retention=90;
+  closeModal('logModalOverlay'); computeStats(); renderQueue(); renderManageTable(); toast(skill.name+' marked as reviewed.');
+});
+
+/* ================= MANAGE SKILLS (CRUD) ================= */
+function renderManageTable(){
+  const body = document.getElementById('manageTableBody');
+  const term = document.getElementById('manageSearch').value.trim().toLowerCase();
+  const cat = document.getElementById('manageCategory').value;
+  const rows = skills.filter(s => (cat==='all'||s.category===cat) && s.name.toLowerCase().includes(term));
+  body.innerHTML = rows.map(s=>`
+    <tr class="border-b border-white/5 hover:bg-white/[0.02]">
+      <td class="px-4 py-3 font-medium text-slate-200">${s.name}</td>
+      <td class="px-4 py-3 text-slate-400">${s.category}</td>
+      <td class="px-4 py-3"><span class="badge-${s.status} text-[10px] px-2 py-0.5 rounded-full">${s.status==='atrisk'?'At Risk':s.status.charAt(0).toUpperCase()+s.status.slice(1)}</span></td>
+      <td class="px-4 py-3 text-slate-400">${s.ease.toFixed(2)}</td>
+      <td class="px-4 py-3 text-slate-400">${s.interval}</td>
+      <td class="px-4 py-3 text-right"><button data-id="${s.id}" class="rowArchive text-[10px] border border-white/15 rounded-full px-2.5 py-1 hover:bg-white/5">Archive</button></td>
+    </tr>`).join('') || `<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500 text-xs">No skills match your filters.</td></tr>`;
+  document.querySelectorAll('.rowArchive').forEach(btn=> btn.addEventListener('click', e=>{
+    const idx = skills.findIndex(s=>s.id===e.target.dataset.id); if(idx===-1) return;
+    const [skill] = skills.splice(idx,1); archived.push(skill); computeStats(); renderManageTable(); toast(skill.name+' archived.');
+  }));
+}
+document.getElementById('manageSearch').addEventListener('input', renderManageTable);
+document.getElementById('manageCategory').addEventListener('change', renderManageTable);
+document.getElementById('openAddSkillSimple').addEventListener('click', ()=>{ document.getElementById('newSkillName').value=''; openModal('addSkillOverlay'); });
+document.getElementById('cancelAddSkill').addEventListener('click', ()=> closeModal('addSkillOverlay'));
+document.getElementById('addSkillOverlay').addEventListener('click', e=>{ if(e.target.id==='addSkillOverlay') closeModal('addSkillOverlay'); });
+document.getElementById('confirmAddSkill').addEventListener('click', async ()=>{
+  const name = document.getElementById('newSkillName').value.trim(); if(!name){ toast('Give the skill a name first.'); return; }
+  const category = rememberConstellation(document.getElementById('newSkillCategory').value); if(!category){toast('Name this constellation category first.');return;}
+  try {await persistSkill(name,category,4,0);closeModal('addSkillOverlay');computeStats();renderManageTable();toast(name+' added to your constellation.');}catch(error){toast(error.message);}
+});
+
+/* ================= ABYSS ================= */
+const abyssCanvas = document.getElementById('abyssCanvas'); const actx = abyssCanvas.getContext('2d');
+let abyssT=0, abyssRunning=false;
+function resizeAbyss(){ const r = abyssCanvas.parentElement.getBoundingClientRect();
+  abyssCanvas.width=r.width*devicePixelRatio; abyssCanvas.height=r.height*devicePixelRatio;
+  abyssCanvas.style.width=r.width+'px'; abyssCanvas.style.height=r.height+'px';
+  actx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); }
+function drawAbyss(){
+  if(!abyssRunning) return;
+  const w = abyssCanvas.width/devicePixelRatio, h = abyssCanvas.height/devicePixelRatio;
+  actx.clearRect(0,0,w,h); const cx=w/2, cy=h/2;
+  const grad = actx.createRadialGradient(cx,cy,4,cx,cy,90);
+  grad.addColorStop(0,'#000'); grad.addColorStop(0.6,'rgba(15,18,38,0.9)'); grad.addColorStop(1,'rgba(15,18,38,0)');
+  actx.fillStyle=grad; actx.beginPath(); actx.arc(cx,cy,90,0,Math.PI*2); actx.fill();
+  actx.strokeStyle='rgba(199,210,254,0.15)'; actx.beginPath(); actx.arc(cx,cy,90,0,Math.PI*2); actx.stroke();
+  abyssT += 0.004;
+  archived.forEach((s,i)=>{
+    const radius = 140+(i%3)*50; const angle = abyssT+i*(Math.PI*2/Math.max(archived.length,1));
+    const x = cx+Math.cos(angle)*radius, y = cy+Math.sin(angle)*radius*0.55;
+    actx.strokeStyle='rgba(199,210,254,0.08)'; actx.beginPath(); actx.ellipse(cx,cy,radius,radius*0.55,0,0,Math.PI*2); actx.stroke();
+    drawStar(actx,x,y,7,3,'#6b7280',8); actx.fillStyle='#94a3b8'; actx.font='11px Inter, sans-serif'; actx.textAlign='center'; actx.fillText(s.name, x, y+18);
+  });
+  requestAnimationFrame(drawAbyss);
+}
+function renderAbyssList(){
+  document.getElementById('abyssEmpty').classList.toggle('hidden', archived.length>0);
+  document.getElementById('abyssList').innerHTML = archived.map(s=>`
+    <div class="glass rounded-xl p-3 flex items-center justify-between">
+      <div><div class="text-sm font-medium text-slate-300">${s.name}</div><div class="text-[10px] text-slate-500">${s.category}</div></div>
+      <button data-id="${s.id}" class="reigniteBtn text-[10px] border border-teal-400/30 text-teal-300 rounded-full px-3 py-1.5 hover:bg-teal-400/10">Re-Ignite Star</button>
+    </div>`).join('');
+  document.querySelectorAll('.reigniteBtn').forEach(btn=> btn.addEventListener('click', async e=>{
+    const idx = archived.findIndex(s=>s.id===e.target.dataset.id); if(idx===-1) return;
+    try{await astraeaApi('/api/skills/'+archived[idx].id+'/restore',{method:'POST'});}catch(error){toast(error.message);return;}
+    const [skill] = archived.splice(idx,1); skill.status='fading'; skills.push(skill);
+    computeStats(); renderAbyssList(); toast(skill.name+' re-ignited.');
+  }));
+}
+new ResizeObserver(resizeAbyss).observe(abyssCanvas.parentElement);
+document.getElementById('clearAbyssBtn').addEventListener('click',async()=>{if(!archived.length){toast('The Abyss is already empty.');return;}if(!confirm('Permanently delete every archived skill? This cannot be undone.'))return;try{await astraeaApi('/api/skills/archived',{method:'DELETE'});archived.splice(0,archived.length);renderAbyssList();toast('The Abyss has been cleared.');}catch(error){toast(error.message);}});
+
+/* ================= LEARNER MENTOR ACCESS SETTINGS ================= */
+async function renderMentorSettings(){
+  pendingInvites=[]; activeMentors=[];
+  try { const connections=await astraeaApi('/api/learner/mentors'); pendingInvites=connections.filter(x=>x.status===0||x.status==='Pending').map(x=>({id:x.id,email:x.mentorEmail,sentAgo:new Date(x.invitedAtUtc).toLocaleDateString()})); activeMentors=connections.filter(x=>x.status===1||x.status==='Accepted').map(x=>({id:x.id,name:x.mentorName||x.mentorEmail,email:x.mentorEmail,granted:new Date(x.statusUpdatedAtUtc).toLocaleDateString()})); } catch(error) { toast(error.message); }
+  try { const reminders=await astraeaApi('/api/learner/reminders'); const alerts=document.getElementById('mentorReminderAlerts'); alerts.innerHTML=reminders.map(r=>`<button data-id="${r.id}" class="mentorReminder w-full text-left glass rounded-xl p-3 flex items-center gap-3 border border-teal-400/30"><span class="text-xl pulse-soft" style="color:var(--teal)">★</span><span><span class="block text-xs text-slate-200">Mentor reminder from ${r.mentorName}</span><span class="block text-[11px] text-slate-400 mt-1">${r.message} Tap to view.</span></span></button>`).join(''); document.querySelectorAll('.mentorReminder').forEach(button=>button.addEventListener('click',async()=>{try{await astraeaApi('/api/learner/reminders/'+button.dataset.id+'/viewed',{method:'POST'});button.remove();toast('Reminder viewed.');}catch(error){toast(error.message);}})); } catch { document.getElementById('mentorReminderAlerts').innerHTML=''; }
+  document.getElementById('pendingInvitesTable').innerHTML = pendingInvites.length ? pendingInvites.map(inv=>`
+    <div class="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5">
+      <div><div class="text-xs text-slate-200">${inv.email}</div><div class="text-[10px] text-slate-500">Sent ${inv.sentAgo}</div></div>
+      <button data-id="${inv.id}" class="cancelInviteBtn text-[10px] border border-white/15 rounded-full px-3 py-1.5 hover:bg-white/5">Cancel Invitation</button>
+    </div>`).join('') : `<div class="text-xs text-slate-500">No pending invitations.</div>`;
+  document.getElementById('activeMentorsTable').innerHTML = activeMentors.length ? activeMentors.map(m=>`
+    <div class="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5">
+      <div><div class="text-xs text-slate-200">${m.name}</div><div class="text-[10px] text-slate-500">${m.email} · Granted ${m.granted}</div></div>
+      <div class="flex items-center gap-2">
+        <span class="badge-active text-[10px] px-2 py-0.5 rounded-full">Active</span>
+        <button data-id="${m.id}" class="revokeBtn text-[10px] border border-coral-400/30 rounded-full px-3 py-1.5 hover:bg-red-500/10" style="color:var(--coral); border-color:rgba(226,87,76,0.35)">Revoke Access</button>
+      </div>
+    </div>`).join('') : `<div class="text-xs text-slate-500">No active mentors yet.</div>`;
+  document.querySelectorAll('.cancelInviteBtn').forEach(btn=> btn.addEventListener('click', async e=>{try{await astraeaApi('/api/learner/mentors/invitations/'+e.target.dataset.id,{method:'DELETE'});renderMentorSettings();toast('Invitation cancelled.');}catch(error){toast(error.message);}}));
+  document.querySelectorAll('.revokeBtn').forEach(btn=> btn.addEventListener('click', async e=>{try{await astraeaApi('/api/learner/mentors/'+e.target.dataset.id+'/revoke',{method:'POST'});renderMentorSettings();toast('Mentor access revoked.');}catch(error){toast(error.message);}}));
+}
+document.getElementById('sendInviteBtn').addEventListener('click', async ()=>{
+  const email = document.getElementById('inviteEmail').value.trim(); if(!email){ toast('Enter a mentor email first.'); return; }
+  try{await astraeaApi('/api/learner/mentors/invite',{method:'POST',body:JSON.stringify({email})});document.getElementById('inviteEmail').value='';renderMentorSettings();toast('Invitation sent to '+email);}catch(error){toast(error.message);}
+});
+document.getElementById('inviteEmail').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.getElementById('sendInviteBtn').click();}});
+
+/* ================= MENTOR WORKSPACE ================= */
+async function renderMentorWorkspace(){
+  incomingInvites=[]; activeMentees=[];
+  try { const invitations=await astraeaApi('/api/mentor-invitations'); incomingInvites=invitations.map(x=>({id:x.id,name:x.mentorName||x.mentorEmail,sentAgo:new Date(x.invitedAtUtc).toLocaleDateString()})); } catch(error) { toast(error.message); }
+  try { const mentees=await astraeaApi('/api/mentor-invitations/mentees'); activeMentees=mentees.map(x=>({id:x.id,name:x.fullName,avgRetention:Math.round(x.averageRetention),totalStars:x.skillCount,lastActive:new Date(x.lastActiveUtc).toLocaleDateString()})); } catch(error) { toast(error.message); }
+  document.getElementById('incomingInvitesList').innerHTML = incomingInvites.length ? incomingInvites.map(inv=>`
+    <div class="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5">
+      <div><div class="text-xs text-slate-200">${inv.name}</div><div class="text-[10px] text-slate-500">Sent ${inv.sentAgo}</div></div>
+      <div class="flex items-center gap-2">
+        <button data-id="${inv.id}" class="acceptInviteBtn text-[10px] font-medium rounded-full px-3 py-1.5" style="background:rgba(0,245,212,0.12); color:var(--teal); box-shadow:0 0 12px rgba(0,245,212,0.2)">Accept Invitation</button>
+        <button data-id="${inv.id}" class="declineInviteBtn text-[10px] border border-white/15 rounded-full px-3 py-1.5 hover:bg-white/5">Decline</button>
+      </div>
+    </div>`).join('') : `<div class="text-xs text-slate-500">No pending student invitations.</div>`;
+  document.getElementById('menteeGrid').innerHTML = activeMentees.map(s=>`
+    <div class="glass rounded-xl p-4">
+      <div class="font-display font-semibold text-sm mb-2">${s.name}</div>
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <div class="rounded-lg border border-white/10 bg-white/[0.02] p-2 text-center"><div class="text-[9px] uppercase text-slate-400">Avg Retention</div><div class="font-display text-sm font-semibold" style="color:var(--amber)">${s.avgRetention}%</div></div>
+        <div class="rounded-lg border border-white/10 bg-white/[0.02] p-2 text-center"><div class="text-[9px] uppercase text-slate-400">Active Stars</div><div class="font-display text-sm font-semibold" style="color:var(--teal)">${s.totalStars}</div></div>
+      </div>
+      <div class="text-[10px] text-slate-500 mb-3">Last active ${s.lastActive}</div>
+      <div class="grid grid-cols-2 gap-2"><button data-id="${s.id}" data-name="${s.name}" class="viewMapBtn text-xs font-medium rounded-lg py-2" style="background:rgba(0,245,212,0.1); color:var(--teal); box-shadow:0 0 14px rgba(0,245,212,0.15)">View Map</button><button data-id="${s.id}" class="sendReminderBtn text-xs rounded-lg py-2 border border-amber-400/30 text-amber-300 hover:bg-amber-400/10">Send Reminder</button></div>
+    </div>`).join('') || `<div class="text-xs text-slate-500">No active mentees yet — accept an invitation above.</div>`;
+  document.querySelectorAll('.acceptInviteBtn').forEach(btn=> btn.addEventListener('click', async e=>{try{const session=await astraeaApi('/api/mentor-invitations/'+e.target.dataset.id+'/accept',{method:'POST'});localStorage.setItem('astraea.session',JSON.stringify(session));applyRoleVisibility(session);renderMentorWorkspace();toast('Mentoring invitation accepted.');}catch(error){toast(error.message);}}));
+  document.querySelectorAll('.declineInviteBtn').forEach(btn=> btn.addEventListener('click', async e=>{try{await astraeaApi('/api/mentor-invitations/'+e.target.dataset.id+'/decline',{method:'POST'});renderMentorWorkspace();toast('Invitation declined.');}catch(error){toast(error.message);}}));
+  document.querySelectorAll('.viewMapBtn').forEach(btn=> btn.addEventListener('click', e=>{
+    selectedObserverLearnerId=e.target.dataset.id; document.getElementById('observerStudentName').textContent = e.target.dataset.name; showView('observer'); }));
+  document.querySelectorAll('.sendReminderBtn').forEach(btn=>btn.addEventListener('click',async e=>{try{await astraeaApi('/api/mentor-invitations/learners/'+e.target.dataset.id+'/fading-reminder',{method:'POST'});toast('Fading-skill reminder sent.');}catch(error){toast(error.message);}}));
+}
+
+/* ================= READ-ONLY MENTOR OBSERVER ================= */
+const observerCanvas = document.getElementById('observerCanvas'); const octx = observerCanvas.getContext('2d');
+let observerChartInstance = null;
+function resizeObserverCanvas(){ const r = observerCanvas.parentElement.getBoundingClientRect();
+  observerCanvas.width=r.width*devicePixelRatio; observerCanvas.height=r.height*devicePixelRatio;
+  observerCanvas.style.width=r.width+'px'; observerCanvas.style.height=r.height+'px';
+  octx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); }
+function drawObserverMap(){
+  if(!document.getElementById('view-observer').classList.contains('active')) return;
+  const w = observerCanvas.width/devicePixelRatio, h = observerCanvas.height/devicePixelRatio;
+  octx.clearRect(0,0,w,h);
+  octx.setLineDash([4,4]);
+  observerConnections.forEach(([a,b])=>{
+    const sA=observerSkills.find(s=>s.id===a), sB=observerSkills.find(s=>s.id===b); if(!sA||!sB) return;
+    octx.beginPath(); octx.moveTo(sA.x*w, sA.y*h); octx.lineTo(sB.x*w, sB.y*h); octx.strokeStyle='rgba(199,210,254,0.25)'; octx.lineWidth=1; octx.stroke(); });
+  octx.setLineDash([]);
+  observerSkills.forEach(s=>{ const cx=s.x*w, cy=s.y*h; drawStar(octx,cx,cy,10,4.2,STATUS_COLOR[s.status],14);
+    octx.fillStyle='#C7D2FE'; octx.font='600 12px Space Grotesk, sans-serif'; octx.textAlign='center'; octx.fillText(s.name, cx, cy+26); });
+  requestAnimationFrame(drawObserverMap);
+}
+observerCanvas.addEventListener('mousemove', e=>{
+  const rect = observerCanvas.getBoundingClientRect(); const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  const w = observerCanvas.width/devicePixelRatio, h = observerCanvas.height/devicePixelRatio;
+  const hit = observerSkills.find(s=> Math.hypot(mx-s.x*w, my-s.y*h) < 18);
+  const tip = document.getElementById('observerTooltip');
+  if(hit){ tip.style.opacity=1; tip.style.left=Math.min(mx+14, rect.width-160)+'px'; tip.style.top=Math.max(my-46,4)+'px';
+    tip.innerHTML = `<div class="font-display font-semibold text-xs" style="color:${STATUS_COLOR[hit.status]}">${hit.name}</div><div class="text-[10px] text-slate-400 mt-0.5">${hit.category} · ${formatPercent(hit.retention)}% retention</div>`;
+  } else tip.style.opacity=0;
+});
+async function renderObserver(){
+  observerSkills=[]; observerConnections=[];
+  document.getElementById('observerStars').textContent = '0';
+  document.getElementById('observerAvg').textContent = '0%';
+  if(selectedObserverLearnerId){
+    try{
+      const dashboard=await astraeaApi('/api/mentor-invitations/learners/'+selectedObserverLearnerId);
+      document.getElementById('observerStudentName').textContent=dashboard.learner.fullName;
+      observerSkills=dashboard.nodes.map(node=>localSkillFromNode(node));
+      observerConnections=observerSkills.flatMap(skill=>skill.prerequisiteSkillIds.map(prerequisiteId=>[prerequisiteId,skill.id]));
+    }catch(error){observerSkills=[]; observerConnections=[]; toast(error.message);}
+  }
+  const avg = observerSkills.length ? Math.round(observerSkills.reduce((a,s)=>a+s.retention,0)/observerSkills.length) : 0;
+  document.getElementById('observerStars').textContent = observerSkills.length;
+  document.getElementById('observerAvg').textContent = avg+'%';
+  const el = document.getElementById('observerChart'); if(observerChartInstance) observerChartInstance.destroy();
+  observerChartInstance = new Chart(el, { type:'doughnut', data:{ labels:['Fresh','Fading','At Risk'],
+    datasets:[{ data:[observerSkills.filter(s=>s.status==='fresh').length, observerSkills.filter(s=>s.status==='fading').length, observerSkills.filter(s=>s.status==='atrisk').length],
+      backgroundColor:['#00F5D4','#FFB703','#E2574C'], borderWidth:0 }]},
+    options:{ plugins:{legend:{position:'bottom', labels:{color:'#94a3b8', font:{size:9}, boxWidth:8}}} } });
+  requestAnimationFrame(drawObserverMap);
+}
+new ResizeObserver(resizeObserverCanvas).observe(observerCanvas.parentElement);
+
+/* ================= REPORTS ================= */
+let trendChart, volChart, statusChart;
+function renderReports(){
+  const avg = Math.round(skills.reduce((a,s)=>a+s.retention,0)/skills.length);
+  const trendData = [avg-18,avg-14,avg-9,avg-6,avg-3,avg];
+  const trendEl = document.getElementById('retentionTrendChart'); if(trendChart) trendChart.destroy();
+  trendChart = new Chart(trendEl, { type:'line', data:{ labels:['W1','W2','W3','W4','W5','Now'],
+    datasets:[{ data:trendData, borderColor:'#00F5D4', backgroundColor:'rgba(0,245,212,0.12)', fill:true, tension:0.35, pointRadius:3 }]},
+    options:{ plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#64748b',font:{size:9}}, grid:{color:'rgba(199,210,254,0.06)'}},
+      y:{min:0,max:100, ticks:{color:'#64748b',font:{size:9}}, grid:{color:'rgba(199,210,254,0.06)'}} } } });
+  const volEl = document.getElementById('volumeChart'); if(volChart) volChart.destroy();
+  volChart = new Chart(volEl, { type:'bar', data:{ labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+    datasets:[{label:'GitHub', data:[3,5,2,6,4,1,2], backgroundColor:'#818cf8'},{label:'Manual', data:[1,2,3,1,2,2,1], backgroundColor:'#00F5D4'}]},
+    options:{ plugins:{legend:{labels:{color:'#94a3b8', font:{size:9}}}}, scales:{ x:{ticks:{color:'#64748b',font:{size:9}}, grid:{display:false}},
+      y:{ticks:{color:'#64748b',font:{size:9}}, grid:{color:'rgba(199,210,254,0.06)'}} } } });
+  const fresh = skills.filter(s=>s.status==='fresh').length, fading = skills.filter(s=>s.status==='fading').length, atrisk = skills.filter(s=>s.status==='atrisk').length;
+  const statusEl = document.getElementById('statusChart'); if(statusChart) statusChart.destroy();
+  statusChart = new Chart(statusEl, { type:'bar', data:{ labels:['Fresh','Fading','At Risk'], datasets:[{ data:[fresh,fading,atrisk], backgroundColor:['#00F5D4','#FFB703','#E2574C'] }]},
+    options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#64748b',font:{size:9}}, grid:{color:'rgba(199,210,254,0.06)'}}, y:{ticks:{color:'#cbd5e1',font:{size:10}}, grid:{display:false}} } } });
+}
+
+/* ================= GITHUB SETTINGS ================= */
+function applyGitHubConnectionState(connection){
+  const connected=connection?.isConnected;
+  const username=connection?.gitHubUsername||connection?.githubUsername||'';
+  document.getElementById('githubUsernameLabel').textContent=connected?'@'+username:'Not connected';
+  document.getElementById('githubStatusLabel').innerHTML=connected?`<span class="w-1.5 h-1.5 rounded-full" style="background:var(--teal)"></span>${connection.isVerified?'Verified by GitHub':'Demo connection'}`:`<span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>Connect your own GitHub account`;
+  document.getElementById('lastSync').textContent=connection?.lastSyncDateUtc?new Date(connection.lastSyncDateUtc).toLocaleString():'Never';
+  document.getElementById('reposScanned').textContent=(connection?.reposScanned||0)+' repositories';
+  document.getElementById('connectGithubBtn').classList.toggle('hidden',connected);
+  document.getElementById('manualSyncBtn').classList.toggle('hidden',!connected);
+  document.getElementById('disconnectGithubBtn').classList.toggle('hidden',!connected);
+}
+async function renderGitHubSettings(){
+  try{applyGitHubConnectionState(await astraeaApi('/api/github/connection'));}
+  catch(error){applyGitHubConnectionState(null);console.warn(error);}
+}
+document.getElementById('connectGithubBtn').addEventListener('click',async function(){
+  this.disabled=true; this.textContent='Opening GitHub...';
+  try{const start=await astraeaApi('/api/github/oauth/start',{method:'POST'});window.location.href=start.authorizationUrl;}
+  catch(error){toast(error.message.includes('GitHub OAuth is not configured')?'GitHub OAuth keys are missing in appsettings.':error.message);}
+  finally{this.disabled=false;this.textContent='Connect with GitHub';}
+});
+document.getElementById('manualSyncBtn').addEventListener('click', async function(){
+  this.textContent = 'Syncing...'; this.disabled = true;
+  try{const result=await astraeaApi('/api/github/sync',{method:'POST'});document.getElementById('lastSync').textContent=new Date(result.syncedAtUtc).toLocaleString();document.getElementById('reposScanned').textContent=result.reposScanned+' repositories';await loadPersistedSkills();toast('GitHub sync complete. '+result.signalsImported+' practice signals imported.');}
+  catch(error){toast(error.message);}
+  finally{this.textContent = 'Trigger Manual Sync'; this.disabled = false;}
+});
+document.getElementById('disconnectGithubBtn').addEventListener('click',async()=>{try{await astraeaApi('/api/github/connection',{method:'DELETE'});applyGitHubConnectionState(null);toast('GitHub disconnected.');}catch(error){toast(error.message);}});
+// Authenticated report data and profile controls are layered onto the supplied mockup shell.
+let activeReport = null;
+async function renderReports(){
+  const fallback={skills:skills.map(s=>({skill:s.name,category:s.category,retentionPercent:s.retention,thirtyDayChangePercent:0,status:s.status==='atrisk'?'AtRisk':s.status[0].toUpperCase()+s.status.slice(1)})),reviewsThisMonth:0,longestStreakDays:0,averageRetentionChangePercent:0};
+  try { activeReport=await astraeaApi('/api/reports'); } catch { activeReport=fallback; }
+  const report=activeReport;
+  const averageRetention=report.skills.length?report.skills.reduce((sum,row)=>sum+row.retentionPercent,0)/report.skills.length:0;
+  const trendEl=document.getElementById('retentionTrendChart'); if(trendChart)trendChart.destroy();
+  trendChart=new Chart(trendEl,{type:'line',data:{labels:['25d ago','20d ago','15d ago','10d ago','5d ago','Today'],datasets:[{data:[Math.max(0,averageRetention-18),Math.max(0,averageRetention-14),Math.max(0,averageRetention-9),Math.max(0,averageRetention-6),Math.max(0,averageRetention-3),averageRetention],borderColor:'#00F5D4',backgroundColor:'rgba(0,245,212,.12)',fill:true,tension:.35,pointRadius:3}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#64748b',font:{size:9}},grid:{color:'rgba(199,210,254,.06)'}},y:{min:0,max:100,ticks:{color:'#64748b',font:{size:9}},grid:{color:'rgba(199,210,254,.06)'}}}}});
+  const volumeEl=document.getElementById('volumeChart'); if(volChart)volChart.destroy();
+  volChart=new Chart(volumeEl,{type:'bar',data:{labels:report.skills.map(row=>row.skill),datasets:[{label:'Retention %',data:report.skills.map(row=>row.retentionPercent),backgroundColor:report.skills.map(row=>row.status==='Fresh'?'#00F5D4':row.status==='Fading'?'#FFB703':'#E2574C')}]},options:{plugins:{legend:{labels:{color:'#94a3b8',font:{size:9}}}},scales:{x:{ticks:{color:'#64748b',font:{size:9},maxRotation:45,minRotation:0},grid:{display:false}},y:{beginAtZero:true,max:100,ticks:{color:'#64748b',font:{size:9}},grid:{color:'rgba(199,210,254,.06)'}}}}});
+  document.getElementById('monthlyReviews').textContent=report.reviewsThisMonth;
+  document.getElementById('longestStreak').textContent=report.longestStreakDays+' days';
+  document.getElementById('averageChange').textContent=(report.averageRetentionChangePercent>=0?'+':'')+report.averageRetentionChangePercent+'%';
+  document.getElementById('averageChange').style.color=report.averageRetentionChangePercent>=0?'#00F5D4':'#E2574C';
+  document.getElementById('reportSkillRows').innerHTML=report.skills.map(row=>{const status=row.status==='Fresh'?'#00F5D4':row.status==='Fading'?'#FFB703':'#E2574C';const change=(row.thirtyDayChangePercent>=0?'+':'')+formatPercent(row.thirtyDayChangePercent)+'%';return `<tr class="text-slate-300"><td class="py-2.5 pr-4 font-medium">${row.skill}</td><td class="py-2.5 pr-4 text-slate-400">${row.category}</td><td class="py-2.5 pr-4">${formatPercent(row.retentionPercent)}%</td><td class="py-2.5 pr-4" style="color:${row.thirtyDayChangePercent>=0?'#00F5D4':'#E2574C'}">${change}</td><td class="py-2.5"><span class="text-[10px]" style="color:${status}">${row.status}</span></td></tr>`;}).join('');
+}
+document.getElementById('exportCsvBtn').addEventListener('click',()=>{if(!activeReport){toast('Open Reports before exporting.');return;}const esc=v=>'"'+String(v).replaceAll('"','""')+'"';const csv=['Skill,Category,Retention (%),30-day change (%),Status',...activeReport.skills.map(x=>[x.skill,x.category,x.retentionPercent,x.thirtyDayChangePercent,x.status].map(esc).join(','))].join('\r\n');const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));link.download='astraea-retention-report.csv';link.click();URL.revokeObjectURL(link.href);});
+// API integration: the supplied mockup remains the visual shell; this block enforces session visibility.
+const astraeaSession = JSON.parse(localStorage.getItem('astraea.session') || 'null');
+function applyRoleVisibility(session) {
+  const protectedViews=['dashboard','queue','manage','abyss','mentorSettings','mentorWorkspace','reports','settings'];
+  const mentorNav=document.querySelector('#navTabs [data-view="mentorWorkspace"]');
+  if(mentorNav) mentorNav.textContent=session?.role==='Both'?'Mentees':'Mentor Workspace';
+  document.querySelectorAll('#navTabs [data-view]').forEach(button=>{
+    const view=button.dataset.view;
+    const visible = !!session && (session.role==='Mentor' ? view==='mentorWorkspace' : session.role==='Both' ? view!=='landing'&&view!=='auth' : view!=='mentorWorkspace' && view!=='landing' && view!=='auth');
+    button.classList.toggle('hidden',!visible);
+  });
+  document.querySelectorAll('#mobileNavItems [data-view]').forEach(button=>{
+    const view=button.dataset.view;
+    const visible = !!session && (session.role==='Mentor' ? view==='mentorWorkspace' : session.role==='Both' ? view!=='landing'&&view!=='auth' : view!=='mentorWorkspace' && view!=='landing' && view!=='auth');
+    button.classList.toggle('hidden',!visible);
+  });
+  document.getElementById('profileMenu').classList.toggle('hidden',!session);
+  if(session){document.getElementById('profileName').textContent=session.fullName;document.getElementById('profileRole').textContent=session.role;document.getElementById('profileInitial').textContent=(session.fullName||'A').trim()[0].toUpperCase();}
+  if (!session) showView('landing');
+  else { if(session.role==='Learner'||session.role==='Both'){learnerMapReady=false;skills.splice(0,skills.length);connections.splice(0,connections.length);computeStats();loadPersistedSkills();loadUranusInvitation();} showView(session.role==='Mentor'?'mentorWorkspace':'dashboard'); }
+}
+document.getElementById('brandHome').addEventListener('click',()=>{const session=JSON.parse(localStorage.getItem('astraea.session')||'null');showView(session?.role==='Mentor'?'mentorWorkspace':session?'dashboard':'landing');});
+document.getElementById('profileToggle').addEventListener('click',()=>document.getElementById('profilePopover').classList.toggle('hidden'));
+document.getElementById('logoutBtn').addEventListener('click',()=>{localStorage.removeItem('astraea.session');document.getElementById('profilePopover').classList.add('hidden');applyRoleVisibility(null);toast('You have been logged out.');});
+document.getElementById('changePasswordBtn').addEventListener('click',async()=>{const currentPassword=prompt('Enter your current password:');if(currentPassword===null)return;const newPassword=prompt('Enter a new password (at least 8 characters):');if(!newPassword)return;try{await astraeaApi('/api/auth/change-password',{method:'POST',body:JSON.stringify({currentPassword,newPassword})});document.getElementById('profilePopover').classList.add('hidden');toast('Password changed successfully.');}catch(error){toast(error.message);}});
+applyRoleVisibility(astraeaSession);
+async function astraeaApi(path, options={}) {
+  const session=JSON.parse(localStorage.getItem('astraea.session')||'null');
+  let response;
+  try{response=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(session?{Authorization:`Bearer ${session.accessToken}`}:{}) ,...(options.headers||{})}});}
+  catch(error){throw new Error('Astraea could not reach the backend. Restart the app and open it from the localhost URL, not the HTML file.');}
+  const payload=await response.text();
+  if(!response.ok) throw new Error(payload||'Request failed.');
+  return payload?JSON.parse(payload):null;
+}
+async function loadPersistedSkills(){
+  const session=JSON.parse(localStorage.getItem('astraea.session')||'null'); if(!session||(session.role!=='Learner'&&session.role!=='Both'))return;
+  skills.splice(0,skills.length);connections.splice(0,connections.length);computeStats();
+  try {const [nodes,archivedNodes]=await Promise.all([astraeaApi('/api/skills'),astraeaApi('/api/skills/archived')]);const loaded=nodes.map(node=>localSkillFromNode(node));skills.splice(0,skills.length,...loaded);archived.splice(0,archived.length,...archivedNodes.map(node=>({id:node.id,name:node.title,category:node.constellationCategory,status:node.retentionPercent>=70?'fresh':node.retentionPercent>=40?'fading':'atrisk',ease:node.easeFactor,interval:node.currentIntervalDays+' Days',intervalDays:node.currentIntervalDays,retention:node.retentionPercent,x:node.canvasX,y:node.canvasY,logs:[]})));connections.splice(0,connections.length,...loaded.flatMap(skill=>skill.prerequisiteSkillIds.map(prerequisiteId=>[prerequisiteId,skill.id])));computeStats();renderManageTable();renderAbyssList();}catch(error){console.warn('Unable to load saved skills.',error);}finally{learnerMapReady=true;}
+}
+loadPersistedSkills();
+async function loadUranusInvitation(){const session=JSON.parse(localStorage.getItem('astraea.session')||'null');if(!session||session.role==='Mentor')return;const host=document.getElementById('uranusInvitation');try{const list=await astraeaApi('/api/mentor-invitations');if(!list.length){host.classList.add('hidden');return;}const invite=list[0];host.innerHTML=`<div class="glass rounded-xl border border-teal-400/30 p-3 flex justify-between gap-3"><span class="text-xs"><b class="text-teal-300">♅ ${invite.mentorName||invite.mentorEmail}</b> wants you to be their mentor.</span><span><button id="uranusAccept" class="text-[11px] text-teal-300 mr-3">Accept</button><button id="uranusDecline" class="text-[11px] text-slate-400">Decline</button></span></div>`;host.classList.remove('hidden');document.getElementById('uranusAccept').onclick=async()=>{const updated=await astraeaApi('/api/mentor-invitations/'+invite.id+'/accept',{method:'POST'});localStorage.setItem('astraea.session',JSON.stringify(updated));host.classList.add('hidden');applyRoleVisibility(updated);renderMentorWorkspace();toast('Mentees section unlocked.');};document.getElementById('uranusDecline').onclick=async()=>{await astraeaApi('/api/mentor-invitations/'+invite.id+'/decline',{method:'POST'});host.classList.add('hidden');toast('Invitation declined.');};}catch(error){console.warn(error);}}
+loadUranusInvitation();
+if(new URLSearchParams(window.location.search).get('github')==='connected'){history.replaceState(null,'','/astraea-platform.html');showView('settings');renderGitHubSettings();toast('GitHub account verified.');}
+const githubAuthPayload=new URLSearchParams(window.location.search).get('githubAuth');
+if(githubAuthPayload){try{const normalized=githubAuthPayload.replaceAll('-','+').replaceAll('_','/');const session=JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length/4)*4,'=')));localStorage.setItem('astraea.session',JSON.stringify(session));history.replaceState(null,'','/astraea-platform.html');applyRoleVisibility(session);loadPersistedSkills();toast('Signed in with GitHub.');}catch(error){toast('GitHub sign-in could not be completed.');}}
+</script>
+</body>
+</html>

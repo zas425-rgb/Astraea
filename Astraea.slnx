@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Astraea.Application/Astraea.Application.csproj" />
+  <Project Path="Astraea.Domain/Astraea.Domain.csproj" />
+  <Project Path="Astraea.Infrastructure/Astraea.Infrastructure.csproj" />
+  <Project Path="Astraea.Tests/Astraea.Tests.csproj" />
+  <Project Path="Astraea.Web/Astraea.Web.csproj" />
+</Solution>

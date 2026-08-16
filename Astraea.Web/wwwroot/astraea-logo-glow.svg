@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="512" height="512">
+  <defs>
+    <!-- soft outer glow for the line -->
+    <filter id="lineGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- stronger glow for the star -->
+    <filter id="starGlow" x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.4" result="blur1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="0.8" result="blur2"/>
+      <feMerge>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <radialGradient id="ambientBloom" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00F5D4" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#00F5D4" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- badge -->
+  <rect width="64" height="64" rx="14" fill="#0A0E24"/>
+
+  <!-- glowing line: dips (forgetting) then rises (recall) -->
+  <path d="M11,26 L22,40 L31,30 L39,36" fill="none" stroke="#00F5D4" stroke-width="3.4"
+        stroke-linecap="round" stroke-linejoin="round" filter="url(#lineGlow)"/>
+
+  <!-- glowing star point -->
+  <path d="M46,17 C46.6,21.4 47.6,22.4 52,23 C47.6,23.6 46.6,24.6 46,29 C45.4,24.6 44.4,23.6 40,23 C44.4,22.4 45.4,21.4 46,17 Z"
+        fill="#00F5D4" filter="url(#starGlow)"/>
+</svg>
