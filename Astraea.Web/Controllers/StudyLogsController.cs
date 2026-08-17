@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Astraea.Application;
 using Astraea.Application.Study;
+using Astraea.Web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,9 +13,10 @@ namespace Astraea.Web;
 public sealed class StudyLogsController(IStudyLogService service) : ControllerBase
 {
     [HttpPost]
-    public Task<CelestialNodeDto> Create(StudyLogCreateDto request, CancellationToken ct)
+    public async Task<CelestialNodeVm> Create(StudyLogCreateDto request, CancellationToken ct)
     {
-        return service.RecordAsync(CurrentUserId, request, ct);
+        var updatedSkill = await service.RecordAsync(CurrentUserId, request, ct);
+        return updatedSkill.ToVm();
     }
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);

@@ -33,6 +33,7 @@ secrets.json
 
 # Local-only study/prep notes
 STUDY_GUIDE.md
+PROFESSOR_DRILL_SHEET.md
 
 # Temporary files
 *.tmp

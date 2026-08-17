@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Astraea.Application;
+using Astraea.Web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,18 +14,27 @@ public sealed class GitHubController(IGitHubSyncService github) : ControllerBase
     private Guid Me => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpGet("connection")]
-    public Task<GitHubConnectionDto> Connection(CancellationToken ct) => github.GetConnectionAsync(Me, ct);
+    public async Task<GitHubConnectionVm> Connection(CancellationToken ct)
+    {
+        var connection = await github.GetConnectionAsync(Me, ct);
+        return connection.ToVm();
+    }
 
     [HttpPost("connect")]
-    public Task<GitHubConnectionDto> Connect(GitHubConnectRequest request, CancellationToken ct) => github.ConnectAsync(Me, request, ct);
+    public async Task<GitHubConnectionVm> Connect(GitHubConnectRequest request, CancellationToken ct)
+    {
+        var connection = await github.ConnectAsync(Me, request, ct);
+        return connection.ToVm();
+    }
 
     [HttpPost("oauth/start")]
-    public async Task<ActionResult<GitHubOAuthStartDto>> StartOAuth(CancellationToken ct)
+    public async Task<ActionResult<GitHubOAuthStartVm>> StartOAuth(CancellationToken ct)
     {
         try
         {
             var callbackUrl = $"{Request.Scheme}://{Request.Host}/api/auth/github/callback";
-            return Ok(await github.BeginOAuthAsync(Me, callbackUrl, ct));
+            var start = await github.BeginOAuthAsync(Me, callbackUrl, ct);
+            return Ok(start.ToVm());
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("GitHub:Client", StringComparison.OrdinalIgnoreCase))
         {
@@ -41,8 +51,15 @@ public sealed class GitHubController(IGitHubSyncService github) : ControllerBase
     }
 
     [HttpPost("sync")]
-    public Task<GitHubSyncResultDto> Sync(CancellationToken ct) => github.SyncAsync(Me, ct);
+    public async Task<GitHubSyncResultVm> Sync(CancellationToken ct)
+    {
+        var result = await github.SyncAsync(Me, ct);
+        return result.ToVm();
+    }
 
     [HttpDelete("connection")]
-    public Task Disconnect(CancellationToken ct) => github.DisconnectAsync(Me, ct);
+    public Task Disconnect(CancellationToken ct)
+    {
+        return github.DisconnectAsync(Me, ct);
+    }
 }

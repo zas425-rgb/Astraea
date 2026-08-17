@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Astraea.Application;
 using Astraea.Domain;
 using Astraea.Infrastructure;
+using Astraea.Web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +17,7 @@ public sealed class RefresherContentController(AstraeaDbContext db) : Controller
     private Guid Me => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpGet("skills/{skillId:guid}")]
-    public async Task<IReadOnlyCollection<RefresherContentDto>> GetForSkill(Guid skillId, CancellationToken ct)
+    public async Task<IReadOnlyCollection<RefresherContentVm>> GetForSkill(Guid skillId, CancellationToken ct)
     {
         var skill = await db.Skills
             .AsNoTracking()
@@ -42,14 +43,16 @@ public sealed class RefresherContentController(AstraeaDbContext db) : Controller
 
         if (saved.Count > 0)
         {
-            return saved;
+            return saved.Select(x => x.ToVm()).ToArray();
         }
 
-        return
+        RefresherContentDto[] generated =
         [
             Generated(skill.Id, $"{skill.Title} refresher for self taught learners", $"{skill.Title} refresher self taught learners"),
             Generated(skill.Id, $"{skill.Title} practice review", $"{skill.Title} practice review tutorial")
         ];
+
+        return generated.Select(x => x.ToVm()).ToArray();
     }
 
     private static RefresherContentDto Generated(Guid skillId, string title, string query)

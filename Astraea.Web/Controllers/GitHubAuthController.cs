@@ -7,6 +7,7 @@ using System.Text.Json.Serialization;
 using Astraea.Application;
 using Astraea.Domain;
 using Astraea.Infrastructure;
+using Astraea.Web.ViewModels;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -27,7 +28,7 @@ public sealed class GitHubAuthController(
     private readonly IDataProtector tokenProtector = dataProtectionProvider.CreateProtector("Astraea.GitHub.AccessTokens.v1");
 
     [HttpPost("start")]
-    public ActionResult<GitHubOAuthStartDto> Start()
+    public ActionResult<GitHubOAuthStartVm> Start()
     {
         var clientId = configuration["GitHub:ClientId"];
         if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(configuration["GitHub:ClientSecret"]))
@@ -42,7 +43,7 @@ public sealed class GitHubAuthController(
             $"&redirect_uri={Uri.EscapeDataString(callbackUrl)}" +
             $"&scope={Uri.EscapeDataString("read:user user:email repo")}" +
             $"&state={Uri.EscapeDataString(state)}";
-        return Ok(new GitHubOAuthStartDto(url));
+        return Ok(new GitHubOAuthStartVm(url));
     }
 
     [HttpGet("callback")]
@@ -108,7 +109,7 @@ public sealed class GitHubAuthController(
         githubConnection.ConnectedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        var response = new AuthResponseDto(tokens.Create(user), user.Id, user.FullName, user.Role.ToString());
+        var response = new AuthResponseVm(tokens.Create(user), user.Id, user.FullName, user.Role.ToString());
         var encoded = Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(response, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
         return Redirect($"/astraea-platform.html?githubAuth={encoded}");
     }

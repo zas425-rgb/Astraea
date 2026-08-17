@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Astraea.Application;
+using Astraea.Web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,15 +11,17 @@ namespace Astraea.Web;
 public sealed class AuthController(IAuthService service) : ControllerBase
 {
     [HttpPost("register")]
-    public Task<AuthResponseDto> Register(RegisterUserRequest request, CancellationToken ct)
+    public async Task<AuthResponseVm> Register(RegisterUserRequest request, CancellationToken ct)
     {
-        return service.RegisterAsync(request, ct);
+        var response = await service.RegisterAsync(request, ct);
+        return response.ToVm();
     }
 
     [HttpPost("login")]
-    public Task<AuthResponseDto> Login(LoginRequest request, CancellationToken ct)
+    public async Task<AuthResponseVm> Login(LoginRequest request, CancellationToken ct)
     {
-        return service.LoginAsync(request, ct);
+        var response = await service.LoginAsync(request, ct);
+        return response.ToVm();
     }
 
     [HttpPost("forgot-password/reset")]
@@ -53,20 +56,21 @@ public sealed class AuthController(IAuthService service) : ControllerBase
 public sealed class LearnerMentorsController(IMentorService service) : ControllerBase
 {
     [HttpGet]
-    public Task<IReadOnlyCollection<MentorLearnerDto>> Get(CancellationToken ct)
+    public async Task<IReadOnlyCollection<MentorLearnerVm>> Get(CancellationToken ct)
     {
-        return service.GetLearnerMentorsAsync(CurrentUserId, ct);
+        var mentors = await service.GetLearnerMentorsAsync(CurrentUserId, ct);
+        return mentors.Select(x => x.ToVm()).ToArray();
     }
 
     [HttpPost("invite")]
-    public async Task<ActionResult<MentorLearnerDto>> Invite(
+    public async Task<ActionResult<MentorLearnerVm>> Invite(
         MentorInviteRequest request,
         CancellationToken ct)
     {
         try
         {
             var invite = await service.InviteMentorAsync(CurrentUserId, request.Email, ct);
-            return Ok(invite);
+            return Ok(invite.ToVm());
         }
         catch (InvalidOperationException ex)
         {
@@ -95,15 +99,17 @@ public sealed class LearnerMentorsController(IMentorService service) : Controlle
 public sealed class SkillsController(ISkillService service) : ControllerBase
 {
     [HttpGet]
-    public Task<IReadOnlyCollection<CelestialNodeDto>> Get(CancellationToken ct)
+    public async Task<IReadOnlyCollection<CelestialNodeVm>> Get(CancellationToken ct)
     {
-        return service.GetSkillsAsync(CurrentUserId, ct);
+        var skills = await service.GetSkillsAsync(CurrentUserId, ct);
+        return skills.Select(x => x.ToVm()).ToArray();
     }
 
     [HttpPost]
-    public Task<CelestialNodeDto> Create(CreateSkillRequest request, CancellationToken ct)
+    public async Task<CelestialNodeVm> Create(CreateSkillRequest request, CancellationToken ct)
     {
-        return service.CreateSkillAsync(CurrentUserId, request, ct);
+        var skill = await service.CreateSkillAsync(CurrentUserId, request, ct);
+        return skill.ToVm();
     }
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -115,9 +121,10 @@ public sealed class SkillsController(ISkillService service) : ControllerBase
 public sealed class ReportsController(IReportService service) : ControllerBase
 {
     [HttpGet]
-    public Task<LearnerReportDto> Get(CancellationToken ct)
+    public async Task<LearnerReportVm> Get(CancellationToken ct)
     {
-        return service.GetLearnerReportAsync(CurrentUserId, ct);
+        var report = await service.GetLearnerReportAsync(CurrentUserId, ct);
+        return report.ToVm();
     }
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -129,9 +136,10 @@ public sealed class ReportsController(IReportService service) : ControllerBase
 public sealed class LearnerRemindersController(IReminderService service) : ControllerBase
 {
     [HttpGet]
-    public Task<IReadOnlyCollection<MentorReminderDto>> Get(CancellationToken ct)
+    public async Task<IReadOnlyCollection<MentorReminderVm>> Get(CancellationToken ct)
     {
-        return service.GetUnreadForLearnerAsync(CurrentUserId, ct);
+        var reminders = await service.GetUnreadForLearnerAsync(CurrentUserId, ct);
+        return reminders.Select(x => x.ToVm()).ToArray();
     }
 
     [HttpPost("{id:guid}/viewed")]
@@ -151,15 +159,17 @@ public sealed class MentorPortalController(
     IReminderService reminders) : ControllerBase
 {
     [HttpGet("invitations")]
-    public Task<IReadOnlyCollection<MentorLearnerDto>> Invitations(CancellationToken ct)
+    public async Task<IReadOnlyCollection<MentorLearnerVm>> Invitations(CancellationToken ct)
     {
-        return service.GetPendingInvitationsForMentorAsync(CurrentUserId, ct);
+        var invitations = await service.GetPendingInvitationsForMentorAsync(CurrentUserId, ct);
+        return invitations.Select(x => x.ToVm()).ToArray();
     }
 
     [HttpPost("invitations/{id:guid}/accept")]
-    public Task<AuthResponseDto> Accept(Guid id, CancellationToken ct)
+    public async Task<AuthResponseVm> Accept(Guid id, CancellationToken ct)
     {
-        return service.AcceptInvitationAsync(id, CurrentUserId, ct);
+        var response = await service.AcceptInvitationAsync(id, CurrentUserId, ct);
+        return response.ToVm();
     }
 
     [HttpPost("invitations/{id:guid}/decline")]
@@ -169,15 +179,17 @@ public sealed class MentorPortalController(
     }
 
     [HttpGet("mentees")]
-    public Task<IReadOnlyCollection<LearnerSummaryDto>> Mentees(CancellationToken ct)
+    public async Task<IReadOnlyCollection<LearnerSummaryVm>> Mentees(CancellationToken ct)
     {
-        return service.GetActiveMenteesAsync(CurrentUserId, ct);
+        var mentees = await service.GetActiveMenteesAsync(CurrentUserId, ct);
+        return mentees.Select(x => x.ToVm()).ToArray();
     }
 
     [HttpGet("learners/{learnerId:guid}")]
-    public Task<LearnerDashboardDto> Dashboard(Guid learnerId, CancellationToken ct)
+    public async Task<LearnerDashboardVm> Dashboard(Guid learnerId, CancellationToken ct)
     {
-        return service.GetLearnerDashboardReadOnlyAsync(CurrentUserId, learnerId, ct);
+        var dashboard = await service.GetLearnerDashboardReadOnlyAsync(CurrentUserId, learnerId, ct);
+        return dashboard.ToVm();
     }
 
     [HttpPost("learners/{learnerId:guid}/fading-reminder")]
