@@ -569,6 +569,9 @@ function drawStar(ctx,cx,cy,oR,iR,color,glow){
 }
 function toast(msg){ const t=document.getElementById('toast'); document.getElementById('toastText').textContent=msg;
   t.classList.remove('opacity-0','translate-y-4'); setTimeout(()=> t.classList.add('opacity-0','translate-y-4'), 2200); }
+function parseBackendUtc(value){if(!value)return new Date();if(value instanceof Date)return value;const text=String(value);return new Date(/[zZ]$|[+-]\d\d:\d\d$/.test(text)?text:text+'Z');}
+function relativeTime(value){const date=parseBackendUtc(value);const seconds=Math.max(0,Math.floor((Date.now()-date.getTime())/1000));if(seconds<60)return'Just now';const minutes=Math.floor(seconds/60);if(minutes<60)return minutes+' minute'+(minutes===1?'':'s')+' ago';const hours=Math.floor(minutes/60);if(hours<24)return hours+' hour'+(hours===1?'':'s')+' ago';const days=Math.floor(hours/24);if(days<30)return days+' day'+(days===1?'':'s')+' ago';const months=Math.floor(days/30);if(months<12)return months+' month'+(months===1?'':'s')+' ago';const years=Math.floor(months/12);return years+' year'+(years===1?'':'s')+' ago';}
+function dueText(value,intervalDays){const date=value?parseBackendUtc(value):new Date(Date.now()+(Number(intervalDays)||1)*86400000);const diffDays=Math.ceil((date.getTime()-Date.now())/86400000);if(diffDays<0)return'Overdue';if(diffDays===0)return'Today';if(diffDays===1)return'in 1 day';return'in '+diffDays+' days';}
 function openModal(id){ document.getElementById(id).classList.remove('opacity-0','pointer-events-none'); }
 function closeModal(id){ document.getElementById(id).classList.add('opacity-0','pointer-events-none'); }
 
@@ -852,13 +855,14 @@ document.getElementById('closeDrawer').addEventListener('click', closeDrawerFn);
 overlay.addEventListener('click', closeDrawerFn);
 document.getElementById('logReviewBtn').addEventListener('click', async ()=>{
   const skill = skills.find(s=>s.id===activeSkillId); if(!skill) return;
-  try{await astraeaApi('/api/studylogs',{method:'POST',body:JSON.stringify({skillId:skill.id,studiedAtUtc:new Date().toISOString(),selfRating:5,notes:'Reviewed from skill detail'})});}catch(error){toast(error.message);return;}
+  let updatedNode;
+  try{updatedNode=await astraeaApi('/api/studylogs',{method:'POST',body:JSON.stringify({skillId:skill.id,studiedAtUtc:new Date().toISOString(),selfRating:5,notes:'Reviewed from skill detail'})});}catch(error){toast(error.message);return;}
   skill.logs.unshift({type:'manual', text:'Logged manual review session', when:'Just now'});
-  skill.status='fresh'; skill.ease=Math.min(2.6, skill.ease+0.2); skill.interval='18 Days'; skill.due='in 18 days'; skill.retention=90;
+  applySkillNode(skill,updatedNode);
   renderTimeline(skill); renderDrawerChart(skill);
   document.getElementById('mEase').textContent = skill.ease.toFixed(2);
   document.getElementById('mInterval').textContent = skill.interval;
-  document.getElementById('mDue').textContent = skill.due; document.getElementById('mDue').style.color='#FFB703';
+  document.getElementById('mDue').textContent = skill.due; document.getElementById('mDue').style.color=skill.due==='Overdue' ? '#E2574C' : '#FFB703';
   computeStats(); toast(skill.name+' marked as reviewed.');
 });
 document.getElementById('youtubeBtn').addEventListener('click', async ()=>{
@@ -905,7 +909,8 @@ document.getElementById('fabAddSkill').addEventListener('click', ()=>{
 });
 document.getElementById('cancelCelestial').addEventListener('click', ()=> closeModal('celestialModalOverlay'));
 document.getElementById('celestialModalOverlay').addEventListener('click', e=>{ if(e.target.id==='celestialModalOverlay') closeModal('celestialModalOverlay'); });
-function localSkillFromNode(node,hours=0){const status=node.riskStatus===0||node.riskStatus==='Fresh'?'fresh':node.riskStatus===1||node.riskStatus==='Fading'?'fading':'atrisk';return{id:node.id,name:node.title,category:node.constellationCategory,status,ease:node.easeFactor,interval:node.currentIntervalDays+' Days',intervalDays:node.currentIntervalDays,due:'in '+node.currentIntervalDays+' days',retention:node.retentionPercent,x:node.canvasX,y:node.canvasY,prerequisiteSkillIds:node.prerequisiteSkillIds||[],logs:[{type:'manual',text:`Skill added — target ${hours}h/week`,when:'Just now'}]};}
+function localSkillFromNode(node,hours=null){const status=node.riskStatus===0||node.riskStatus==='Fresh'?'fresh':node.riskStatus===1||node.riskStatus==='Fading'?'fading':'atrisk';const weeklyHours=hours??Number(node.targetWeeklyHours??0);const lastReviewed=node.lastReviewedUtc||new Date().toISOString();return{id:node.id,name:node.title,category:node.constellationCategory,status,ease:node.easeFactor,interval:node.currentIntervalDays+' Days',intervalDays:node.currentIntervalDays,due:dueText(node.nextReviewDueDateUtc,node.currentIntervalDays),retention:node.retentionPercent,x:node.canvasX,y:node.canvasY,prerequisiteSkillIds:node.prerequisiteSkillIds||[],logs:[{type:'manual',text:`Skill added - target ${weeklyHours}h/week`,when:relativeTime(lastReviewed)}]};}
+function applySkillNode(skill,node){const updated=localSkillFromNode(node);skill.name=updated.name;skill.category=updated.category;skill.status=updated.status;skill.ease=updated.ease;skill.interval=updated.interval;skill.intervalDays=updated.intervalDays;skill.due=updated.due;skill.retention=updated.retention;skill.x=updated.x;skill.y=updated.y;skill.prerequisiteSkillIds=updated.prerequisiteSkillIds;}
 async function persistSkill(name,category,rating,hours,prerequisiteSkillIds=[]){const node=await astraeaApi('/api/skills',{method:'POST',body:JSON.stringify({title:name,constellationCategory:category,initialRating:rating,targetWeeklyHours:Number(hours)||0,prerequisiteSkillIds})});const skill=localSkillFromNode(node,hours);skills.push(skill);return skill;}
 document.getElementById('confirmCelestial').addEventListener('click', async ()=>{
   const name = document.getElementById('csTitle').value.trim();
@@ -950,9 +955,10 @@ document.getElementById('logModalOverlay').addEventListener('click', e=>{ if(e.t
 document.getElementById('confirmLogModal').addEventListener('click', async ()=>{
   const skill = skills.find(s=>s.id===logModalSkillId); if(!skill) return;
   const notes = document.getElementById('logModalNotes').value.trim();
-  try{await astraeaApi('/api/studylogs',{method:'POST',body:JSON.stringify({skillId:skill.id,studiedAtUtc:new Date().toISOString(),selfRating:5,notes})});}catch(error){toast(error.message);return;}
+  let updatedNode;
+  try{updatedNode=await astraeaApi('/api/studylogs',{method:'POST',body:JSON.stringify({skillId:skill.id,studiedAtUtc:new Date().toISOString(),selfRating:5,notes})});}catch(error){toast(error.message);return;}
   skill.logs.unshift({type:'manual', text: notes ? 'Logged review: "'+notes+'"' : 'Marked reviewed from Review Queue', when:'Just now'});
-  skill.status='fresh'; skill.ease=Math.min(2.6, skill.ease+0.2); skill.interval='18 Days'; skill.due='in 18 days'; skill.retention=90;
+  applySkillNode(skill,updatedNode);
   closeModal('logModalOverlay'); computeStats(); renderQueue(); renderManageTable(); toast(skill.name+' marked as reviewed.');
 });
 

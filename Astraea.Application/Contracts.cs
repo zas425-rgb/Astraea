@@ -9,7 +9,7 @@ public record MentorInviteRequest(string Email);
 public record MentorLearnerDto(Guid Id,string MentorEmail,string? MentorName,MentorLearnerStatus Status,DateTime InvitedAtUtc,DateTime StatusUpdatedAtUtc);
 public record LearnerSummaryDto(Guid Id,string FullName,string Email,int SkillCount,double AverageRetention,DateTime LastActiveUtc);
 public record CreateSkillRequest(string Title,string ConstellationCategory,int InitialRating,decimal TargetWeeklyHours,IReadOnlyCollection<Guid>? PrerequisiteSkillIds);
-public record CelestialNodeDto(Guid Id,string Title,string ConstellationCategory,int Rating,double EaseFactor,int CurrentIntervalDays,double CanvasX,double CanvasY,double RetentionPercent,RiskStatus RiskStatus,IReadOnlyCollection<Guid> PrerequisiteSkillIds);
+public record CelestialNodeDto(Guid Id,string Title,string ConstellationCategory,int Rating,decimal TargetWeeklyHours,double EaseFactor,int CurrentIntervalDays,DateTime LastReviewedUtc,DateTime NextReviewDueDateUtc,double CanvasX,double CanvasY,double RetentionPercent,RiskStatus RiskStatus,IReadOnlyCollection<Guid> PrerequisiteSkillIds);
 public record LearnerDashboardDto(LearnerSummaryDto Learner,IReadOnlyCollection<CelestialNodeDto> Nodes);
 public record SkillReportRowDto(string Skill,string Category,double RetentionPercent,double ThirtyDayChangePercent,string Status);
 public record LearnerReportDto(IReadOnlyCollection<SkillReportRowDto> Skills,int ReviewsThisMonth,int LongestStreakDays,double AverageRetentionChangePercent);
